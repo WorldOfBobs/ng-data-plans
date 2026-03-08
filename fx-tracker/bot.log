@@ -1,20 +1,19 @@
-2026-03-08 14:19:27,875 INFO 🚀 FX Tracker bot starting...
-2026-03-08 14:19:28,367 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getMe "HTTP/1.1 200 OK"
-2026-03-08 14:19:28,369 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-03-08 14:19:28,371 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-03-08 14:19:28,371 INFO Jobs scheduled: poll every 900s, briefing at 7:00 UTC
-2026-03-08 14:19:28,509 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/deleteWebhook "HTTP/1.1 200 OK"
-2026-03-08 14:19:28,510 INFO Added job "job_poll_rates" to job store "default"
-2026-03-08 14:19:28,511 INFO Added job "job_daily_briefing" to job store "default"
-2026-03-08 14:19:28,511 INFO Scheduler started
-2026-03-08 14:19:28,511 INFO Application started
-2026-03-08 14:19:38,376 INFO Running job "job_poll_rates (trigger: interval[0:15:00], next run at: 2026-03-08 18:34:38 UTC)" (scheduled at 2026-03-08 18:19:38.368457+00:00)
-2026-03-08 14:19:38,923 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getUpdates "HTTP/1.1 200 OK"
-/Users/gravy/dev/nigeria-daily-tools/fx-tracker/bot.py:279: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+2026-03-08 14:25:19,739 INFO 🚀 FX Tracker bot starting...
+2026-03-08 14:25:20,183 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getMe "HTTP/1.1 200 OK"
+2026-03-08 14:25:20,185 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-08 14:25:20,188 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-08 14:25:20,188 INFO Jobs scheduled: poll every 900s, briefing at 7:00 UTC
+2026-03-08 14:25:20,326 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/deleteWebhook "HTTP/1.1 200 OK"
+2026-03-08 14:25:20,328 INFO Added job "job_poll_rates" to job store "default"
+2026-03-08 14:25:20,329 INFO Added job "job_daily_briefing" to job store "default"
+2026-03-08 14:25:20,329 INFO Scheduler started
+2026-03-08 14:25:20,329 INFO Application started
+2026-03-08 14:25:30,189 INFO Running job "job_poll_rates (trigger: interval[0:15:00], next run at: 2026-03-08 18:40:30 UTC)" (scheduled at 2026-03-08 18:25:30.184816+00:00)
+2026-03-08 14:25:30,748 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getUpdates "HTTP/1.1 200 OK"
+2026-03-08 14:25:31,335 INFO Live sources for USD: {'Wise': 1389.39}
+/Users/gravy/dev/nigeria-daily-tools/fx-tracker/bot.py:306: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
   saved["fetched_at"] = datetime.utcnow().isoformat()
-2026-03-08 14:19:40,051 INFO Poll done. USD parallel: ₦1,620.00
-2026-03-08 14:19:40,052 INFO Job "job_poll_rates (trigger: interval[0:15:00], next run at: 2026-03-08 18:34:38 UTC)" executed successfully
-2026-03-08 14:19:49,119 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getUpdates "HTTP/1.1 200 OK"
-2026-03-08 14:19:59,271 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getUpdates "HTTP/1.1 200 OK"
-2026-03-08 14:20:09,417 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getUpdates "HTTP/1.1 200 OK"
-2026-03-08 14:20:19,564 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getUpdates "HTTP/1.1 200 OK"
+2026-03-08 14:25:31,338 INFO Poll done. USD parallel: ₦1,389.39
+2026-03-08 14:25:31,339 INFO Job "job_poll_rates (trigger: interval[0:15:00], next run at: 2026-03-08 18:40:30 UTC)" executed successfully
+2026-03-08 14:25:40,891 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getUpdates "HTTP/1.1 200 OK"
+2026-03-08 14:25:51,042 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getUpdates "HTTP/1.1 200 OK"

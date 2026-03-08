@@ -35,15 +35,42 @@ CURRENCY_FLAGS = {"USD": "🇺🇸", "GBP": "🇬🇧", "EUR": "🇪🇺"}
 
 def format_rate(r: dict, currency="USD") -> str:
     flag = CURRENCY_FLAGS.get(currency, "💵")
-    spread_emoji = "🟢" if r["spread_pct"] < 5 else "🟡" if r["spread_pct"] < 15 else "🔴"
+    spread = r.get("spread", r.get("parallel_rate", 0) - r.get("cbn_rate", 0))
+    spread_pct = r.get("spread_pct", 0)
+    spread_emoji = "🟢" if spread_pct < 5 else "🟡" if spread_pct < 15 else "🔴"
     ts = r.get("fetched_at", "")[:16] or datetime.utcnow().strftime("%Y-%m-%d %H:%M")
-    return (
-        f"{flag} *{currency}/NGN Rate* {spread_emoji}\n\n"
-        f"🏦 CBN Official:    ₦{r['cbn_rate']:,.2f}\n"
-        f"🏪 Parallel Market: ₦{r['parallel_rate']:,.2f}\n"
-        f"📊 Spread:          ₦{r['spread']:,.2f} ({r['spread_pct']:.1f}%)\n\n"
-        f"🕐 {ts} UTC"
-    )
+
+    lines = [
+        f"{flag} *{currency}/NGN Rate* {spread_emoji}",
+        "",
+        f"🏦 CBN Official:    ₦{r['cbn_rate']:,.2f}",
+        f"🏪 Parallel Market: ₦{r['parallel_rate']:,.2f}",
+        f"📊 Spread:          ₦{spread:,.2f} ({spread_pct:.1f}%)",
+    ]
+
+    # Source breakdown if available
+    sources = r.get("sources")
+    if sources:
+        lines.append("")
+        lines.append("📡 *Sources:*")
+        for s in sources:
+            if s["rate"] is None:
+                lines.append(f"  ⚫ {s['name']}: unavailable")
+            elif s["reliable"] is False:
+                lines.append(f"  ⚠️ {s['name']}: ₦{s['rate']:,.0f} _(outlier — {s.get('deviation_pct',0):.0f}% off median)_")
+            else:
+                lines.append(f"  ✅ {s['name']}: ₦{s['rate']:,.0f}")
+
+        if not r.get("all_reliable") and r.get("unreliable_sources"):
+            lines.append("")
+            lines.append(f"⚠️ _Some sources are outside the expected range — treat rate as estimate_")
+        elif r.get("is_mock"):
+            lines.append("")
+            lines.append("⚠️ _All sources unavailable — showing cached/mock data_")
+
+    lines.append("")
+    lines.append(f"🕐 {ts} UTC")
+    return "\n".join(lines)
 
 def format_briefing(currency="USD") -> str:
     r = db.get_latest_rate(currency)
@@ -141,12 +168,12 @@ async def cmd_rate(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if currency not in scraper.SUPPORTED_CURRENCIES:
         await update.message.reply_text(f"Supported currencies: USD, GBP, EUR\nExample: `/rate GBP`", parse_mode="Markdown")
         return
-    await update.message.reply_text(f"⏳ Fetching {currency}/NGN rate...")
+    await update.message.reply_text(f"⏳ Fetching {currency}/NGN from all sources...")
     try:
-        rates = await scraper.get_rates(currency)
-        saved = db.save_rate(rates["cbn_rate"], rates["parallel_rate"], rates["source"], currency)
-        saved["fetched_at"] = datetime.utcnow().isoformat()
-        await update.message.reply_text(format_rate(saved, currency), parse_mode="Markdown")
+        rates = await scraper.get_all_sources(currency)
+        db.save_rate(rates["cbn_rate"], rates["parallel_rate"], rates.get("source", "multi"), currency)
+        rates["fetched_at"] = datetime.utcnow().isoformat()
+        await update.message.reply_text(format_rate(rates, currency), parse_mode="Markdown")
     except Exception as e:
         logger.error(f"Rate fetch error: {e}")
         await update.message.reply_text("❌ Failed to fetch rate. Try again shortly.")
@@ -274,8 +301,8 @@ async def job_poll_rates(ctx: ContextTypes.DEFAULT_TYPE):
     """Fetch latest rate, store it, alert subscribers if threshold crossed."""
     try:
         prev = db.get_latest_rate("USD")
-        rates = await scraper.get_rates("USD")
-        saved = db.save_rate(rates["cbn_rate"], rates["parallel_rate"], rates["source"], "USD")
+        rates = await scraper.get_all_sources("USD")
+        saved = db.save_rate(rates["cbn_rate"], rates["parallel_rate"], rates.get("source", "multi"), "USD")
         saved["fetched_at"] = datetime.utcnow().isoformat()
 
         if prev:

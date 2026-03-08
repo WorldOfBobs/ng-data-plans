@@ -27,6 +27,10 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL_SECONDS", "900"))   # 15 min
 DAILY_BRIEFING_HOUR = int(os.getenv("DAILY_BRIEFING_HOUR", "7"))  # 7 UTC = 8am Lagos WAT
 
+# Affiliate links — set in .env to enable, leave blank to hide
+WISE_AFFILIATE_URL   = os.getenv("WISE_AFFILIATE_URL", "")
+REMITLY_AFFILIATE_URL = os.getenv("REMITLY_AFFILIATE_URL", "")
+
 # ──────────────────────────────────────────────
 # Formatting helpers
 # ──────────────────────────────────────────────
@@ -82,6 +86,24 @@ def format_rate(r: dict, currency="USD") -> str:
 
     lines.append("")
     lines.append(f"🕐 {ts} UTC")
+
+    # Affiliate prompt — only shown if URL is configured
+    if WISE_AFFILIATE_URL and currency == "USD":
+        wise_rate = next((s["rate"] for s in (r.get("display_sources") or [])
+                          if "Wise" in s["name"] and s["rate"]), None)
+        rate_str = f"₦{wise_rate:,.0f}/$" if wise_rate else "live rate"
+        lines.append("")
+        lines.append(
+            f"💸 _Sending money to Nigeria? Wise is offering {rate_str} right now._\n"
+            f"[Send with Wise →]({WISE_AFFILIATE_URL})"
+        )
+    elif REMITLY_AFFILIATE_URL and currency == "USD":
+        lines.append("")
+        lines.append(
+            f"💸 _Send money to Nigeria at the live rate._\n"
+            f"[Send with Remitly →]({REMITLY_AFFILIATE_URL})"
+        )
+
     return "\n".join(lines)
 
 def format_briefing(currency="USD") -> str:

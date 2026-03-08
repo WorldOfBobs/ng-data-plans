@@ -48,25 +48,28 @@ def format_rate(r: dict, currency="USD") -> str:
         f"📊 Spread:          ₦{spread:,.2f} ({spread_pct:.1f}%)",
     ]
 
-    # Source breakdown if available
-    sources = r.get("sources")
+    # Source breakdown
+    sources = r.get("display_sources") or r.get("sources")
     if sources:
         lines.append("")
         lines.append("📡 *Sources:*")
+        has_outlier = False
         for s in sources:
             if s["rate"] is None:
                 lines.append(f"  ⚫ {s['name']}: unavailable")
-            elif s["reliable"] is False:
-                lines.append(f"  ⚠️ {s['name']}: ₦{s['rate']:,.0f} _(outlier — {s.get('deviation_pct',0):.0f}% off median)_")
+            elif s.get("status") == "outlier" or s.get("reliable") is False:
+                dev = s.get("deviation_pct") or s.get("deviation_pct", 0)
+                lines.append(f"  ⚠️ {s['name']}: ₦{s['rate']:,.0f} _({dev:.0f}% off — outlier)_")
+                has_outlier = True
             else:
                 lines.append(f"  ✅ {s['name']}: ₦{s['rate']:,.0f}")
 
-        if not r.get("all_reliable") and r.get("unreliable_sources"):
+        if r.get("is_mock"):
             lines.append("")
-            lines.append(f"⚠️ _Some sources are outside the expected range — treat rate as estimate_")
-        elif r.get("is_mock"):
+            lines.append("⚠️ _All live sources down — showing estimated data_")
+        elif has_outlier:
             lines.append("")
-            lines.append("⚠️ _All sources unavailable — showing cached/mock data_")
+            lines.append("⚠️ _Outlier sources excluded from consensus rate_")
 
     lines.append("")
     lines.append(f"🕐 {ts} UTC")

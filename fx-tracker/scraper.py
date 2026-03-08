@@ -126,57 +126,69 @@ async def _fetch_wise(currency: str = "USD") -> float | None:
         logger.debug(f"Wise: {e}")
     return None
 
-async def _fetch_abokifx() -> float | None:
-    """Scrape abokiFX for Lagos parallel market rate."""
+async def _fetch_open_er() -> float | None:
+    """open.er-api.com — free, no API key, tracks official/market USD/NGN rate."""
     try:
+        async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT) as s:
+            async with s.get("https://open.er-api.com/v6/latest/USD") as r:
+                if r.status == 200:
+                    data = await r.json()
+                    rate = data.get("rates", {}).get("NGN")
+                    if rate and 500 < rate < 5000:
+                        return float(rate)
+    except Exception as e:
+        logger.debug(f"open.er-api: {e}")
+    return None
+
+async def _fetch_remitly(currency: str = "USD") -> float | None:
+    """
+    Remitly send-to-Nigeria rate — shows what the diaspora actually pays.
+    Typically 2-4% above the interbank rate.
+    """
+    try:
+        url = (
+            f"https://www.remitly.com/us/en/nigeria/currency-converter"
+            f"?amount=1&destinationCurrency=NGN"
+        )
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                           "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
+            "Accept": "text/html,application/xhtml+xml",
         }
         async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT) as s:
-            async with s.get("https://abokifx.com/", headers=headers) as r:
+            async with s.get(url, headers=headers) as r:
                 if r.status == 200:
                     html = await r.text()
-                    # Try multiple patterns to find USD parallel rate
-                    patterns = [
-                        r'USD[^<]*?(\d{1,2}[,.]?\d{3})',           # USD followed by 4-digit number
-                        r'"usd"[^}]*?"rate"\s*:\s*"?([\d,.]+)"?',  # JSON-ish
-                        r'dollar.*?(\d{1,2},\d{3})',                # dollar reference
-                    ]
-                    for pat in patterns:
-                        m = re.search(pat, html, re.DOTALL | re.IGNORECASE)
-                        if m:
-                            rate_str = m.group(1).replace(",", "")
-                            try:
-                                rate = float(rate_str)
-                                if 800 < rate < 5000:
-                                    return rate
-                            except ValueError:
-                                continue
+                    m = re.search(r'1\s*USD\s*=\s*([\d,]+\.?\d*)\s*NGN', html, re.I)
+                    if m:
+                        rate = float(m.group(1).replace(",", ""))
+                        if 500 < rate < 5000:
+                            return rate
     except Exception as e:
-        logger.debug(f"abokiFX: {e}")
+        logger.debug(f"Remitly: {e}")
     return None
 
 # ──────────────────────────────────────────────
-# Source registry — ordered by preference
+# Source registry — (name, fetcher, kind)
+# kind: "parallel" | "official" | "remittance"
 # ──────────────────────────────────────────────
 
 USD_SOURCES = [
-    ("Binance P2P", _fetch_binance_p2p),
-    ("Bybit P2P",   _fetch_bybit_p2p),
-    ("OKX P2P",     _fetch_okx_p2p),
-    ("Wise",        lambda: _fetch_wise("USD")),
-    ("abokiFX",     _fetch_abokifx),
+    ("Bybit P2P",   _fetch_bybit_p2p,             "parallel"),
+    ("Wise",        lambda: _fetch_wise("USD"),    "parallel"),
+    ("open.er-api", _fetch_open_er,                "official"),
+    ("Remitly",     lambda: _fetch_remitly("USD"), "remittance"),
+    ("Binance P2P", _fetch_binance_p2p,            "parallel"),  # geo: works from Nigeria
 ]
 
 GBP_SOURCES = [
-    ("Wise (GBP)", lambda: _fetch_wise("GBP")),
+    ("Wise (GBP)",  lambda: _fetch_wise("GBP"),   "parallel"),
+    ("open.er-api", _fetch_open_er,                "official"),
 ]
 
 EUR_SOURCES = [
-    ("Wise (EUR)", lambda: _fetch_wise("EUR")),
+    ("Wise (EUR)",  lambda: _fetch_wise("EUR"),   "parallel"),
+    ("open.er-api", _fetch_open_er,                "official"),
 ]
 
 CURRENCY_SOURCES = {"USD": USD_SOURCES, "GBP": GBP_SOURCES, "EUR": EUR_SOURCES}
@@ -193,7 +205,10 @@ def _median(values: list[float]) -> float:
 async def get_all_sources(currency: str = "USD") -> dict:
     """
     Fetch from all sources in parallel.
-    Returns top 4 to display (reliable first, outliers last, unavailable hidden).
+    - Uses 'official' sources for CBN rate
+    - Uses 'parallel' sources for parallel market rate
+    - Shows 'remittance' as context
+    - Returns top 4 to display (reliable → outlier → unavailable)
     """
     currency = currency.upper()
     if currency not in SUPPORTED_CURRENCIES:
@@ -202,71 +217,73 @@ async def get_all_sources(currency: str = "USD") -> dict:
     source_list = CURRENCY_SOURCES.get(currency, USD_SOURCES)
 
     # Fetch all in parallel
-    results = await asyncio.gather(*[fn() for _, fn in source_list], return_exceptions=True)
+    results = await asyncio.gather(*[fn() for _, fn, _ in source_list], return_exceptions=True)
 
     raw = {}
-    for (name, _), result in zip(source_list, results):
-        raw[name] = result if isinstance(result, float) else None
+    for (name, _, kind), result in zip(source_list, results):
+        raw[name] = {"rate": result if isinstance(result, float) else None, "kind": kind}
 
-    live_rates = [v for v in raw.values() if v is not None]
-    logger.info(f"Live sources [{currency}]: { {k:v for k,v in raw.items() if v} }")
+    live_rates = [v["rate"] for v in raw.values() if v["rate"] is not None]
+    logger.info(f"Live sources [{currency}]: { {k: round(v['rate'],2) for k,v in raw.items() if v['rate']} }")
 
     if not live_rates:
-        # Full fallback to mock
         fallbacks = {"USD": (1580.0, 1640.0), "GBP": (2000.0, 2070.0), "EUR": (1700.0, 1760.0)}
         cbn_fb, par_fb = fallbacks[currency]
         return {
             "currency": currency,
-            "display_sources": [{"name": "All sources unavailable", "rate": None, "status": "unavailable"}],
-            "cbn_rate": cbn_fb,
-            "parallel_rate": par_fb,
+            "display_sources": [{"name": "All sources unavailable", "rate": None, "status": "unavailable", "kind": "parallel"}],
+            "cbn_rate": cbn_fb, "parallel_rate": par_fb,
             "spread": par_fb - cbn_fb,
             "spread_pct": round((par_fb - cbn_fb) / cbn_fb * 100, 1),
-            "all_reliable": False,
-            "is_mock": True,
+            "all_reliable": False, "is_mock": True,
         }
 
+    # Compute median across all live sources (used for outlier detection)
     med = _median(live_rates)
 
     # Tag each source
     tagged = []
-    for name, rate in raw.items():
+    for name, info in raw.items():
+        rate, kind = info["rate"], info["kind"]
         if rate is None:
-            tagged.append({"name": name, "rate": None, "status": "unavailable", "deviation_pct": None})
+            tagged.append({"name": name, "rate": None, "status": "unavailable",
+                           "deviation_pct": None, "kind": kind})
         else:
             dev = abs(rate - med) / med
             tagged.append({
-                "name": name,
-                "rate": rate,
+                "name": name, "rate": rate, "kind": kind,
                 "status": "reliable" if dev <= OUTLIER_THRESHOLD else "outlier",
                 "deviation_pct": round(dev * 100, 1),
             })
 
-    # Sort: reliable first, outlier second, unavailable last
+    # Sort: reliable first, outlier, unavailable last
     order = {"reliable": 0, "outlier": 1, "unavailable": 2}
-    tagged.sort(key=lambda s: order[s["status"]])
+    tagged.sort(key=lambda s: (order[s["status"]], s["kind"] == "unavailable"))
 
-    # Top 4 to display
-    display = tagged[:4]
+    # CBN rate: prefer official sources; fall back to estimating from parallel
+    official_rates = [s["rate"] for s in tagged if s["kind"] == "official" and s["rate"] and s["status"] != "outlier"]
+    cbn = round(_median(official_rates), 2) if official_rates else None
 
-    # Consensus from reliable sources only
-    reliable_rates = [s["rate"] for s in tagged if s["status"] == "reliable"]
-    consensus = _median(reliable_rates) if reliable_rates else med
+    # Parallel rate: P2P + market sources (exclude official and remittance)
+    parallel_rates = [s["rate"] for s in tagged if s["kind"] == "parallel" and s["rate"] and s["status"] != "outlier"]
+    # If no pure parallel, include remittance sources too
+    if not parallel_rates:
+        parallel_rates = [s["rate"] for s in tagged if s["rate"] and s["status"] != "outlier"]
+    parallel = round(_median(parallel_rates), 2) if parallel_rates else round(med, 2)
 
-    # For USD: parallel = consensus of non-CBN sources. For GBP/EUR: use Wise directly.
-    parallel = consensus
-    # Estimate CBN as ~97% of parallel (spread is typically 3-5%)
-    # Wise tracks close to parallel for USD; for GBP/EUR it's more official
-    cbn = round(parallel * 0.965, 2) if currency == "USD" else round(parallel * 0.99, 2)
+    # If CBN not available, estimate from parallel
+    if not cbn:
+        cbn = round(parallel * 0.965, 2)
+
     spread = round(parallel - cbn, 2)
-    spread_pct = round(spread / cbn * 100, 1)
+    spread_pct = round(spread / cbn * 100, 1) if cbn else 0
 
     return {
         "currency": currency,
-        "display_sources": display,
+        "display_sources": tagged[:4],
         "all_sources": tagged,
         "cbn_rate": cbn,
-        "parallel_rate": round(parallel, 2),
+        "parallel_rate": parallel,
         "spread": spread,
         "spread_pct": spread_pct,
         "all_reliable": all(s["status"] == "reliable" for s in tagged if s["rate"] is not None),

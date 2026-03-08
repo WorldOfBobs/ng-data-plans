@@ -54,15 +54,18 @@ def format_rate(r: dict, currency="USD") -> str:
         lines.append("")
         lines.append("📡 *Sources:*")
         has_outlier = False
+        KIND_LABEL = {"parallel": "P2P/market", "official": "official", "remittance": "diaspora"}
         for s in sources:
+            kind = KIND_LABEL.get(s.get("kind", ""), "")
+            tag = f" _[{kind}]_" if kind else ""
             if s["rate"] is None:
-                lines.append(f"  ⚫ {s['name']}: unavailable")
+                lines.append(f"  ⚫ {s['name']}{tag}: unavailable")
             elif s.get("status") == "outlier" or s.get("reliable") is False:
-                dev = s.get("deviation_pct") or s.get("deviation_pct", 0)
-                lines.append(f"  ⚠️ {s['name']}: ₦{s['rate']:,.0f} _({dev:.0f}% off — outlier)_")
+                dev = s.get("deviation_pct") or 0
+                lines.append(f"  ⚠️ {s['name']}{tag}: ₦{s['rate']:,.0f} _({dev:.0f}% off — outlier)_")
                 has_outlier = True
             else:
-                lines.append(f"  ✅ {s['name']}: ₦{s['rate']:,.0f}")
+                lines.append(f"  ✅ {s['name']}{tag}: ₦{s['rate']:,.0f}")
 
         if r.get("is_mock"):
             lines.append("")

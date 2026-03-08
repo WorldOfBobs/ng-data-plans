@@ -1,9 +1,8 @@
 """
 Rate fetching logic.
-Sources (tried in order):
-1. exchangerate-host for official/CBN-ish USD/NGN
-2. Binance P2P NGN/USDT as parallel market proxy (best free source)
-3. Hardcoded mock for dev/testing
+Sources:
+- Binance P2P for USD/NGN parallel market rate
+- exchangerate.host for CBN-ish official rates (USD, GBP, EUR)
 """
 import aiohttp
 import logging
@@ -11,73 +10,84 @@ import logging
 logger = logging.getLogger(__name__)
 
 BINANCE_P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
-EXCHANGERATE_HOST = "https://api.exchangerate.host/latest?base=USD&symbols=NGN"
+EXCHANGERATE_URL = "https://api.exchangerate.host/latest?base={base}&symbols=NGN"
 
-async def fetch_official_rate() -> float | None:
-    """Fetch USD/NGN from exchangerate.host (roughly tracks CBN)."""
+SUPPORTED_CURRENCIES = {"USD", "GBP", "EUR"}
+
+async def fetch_official_rate(currency="USD") -> float | None:
+    """Fetch official NGN rate for a given currency from exchangerate.host."""
     try:
+        url = EXCHANGERATE_URL.format(base=currency)
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
-            async with s.get(EXCHANGERATE_HOST) as r:
+            async with s.get(url) as r:
                 if r.status == 200:
                     data = await r.json()
                     rate = data.get("rates", {}).get("NGN")
                     if rate:
-                        logger.info(f"Official rate fetched: {rate}")
+                        logger.info(f"Official {currency}/NGN: {rate}")
                         return float(rate)
     except Exception as e:
-        logger.warning(f"Official rate fetch failed: {e}")
+        logger.warning(f"Official rate fetch failed ({currency}): {e}")
     return None
 
-async def fetch_parallel_rate() -> tuple[float | None, str]:
-    """
-    Fetch parallel market rate via Binance P2P NGN/USDT.
-    Returns (rate, source_label).
-    """
+async def fetch_parallel_rate_usd() -> tuple[float | None, str]:
+    """Fetch parallel market rate via Binance P2P USDT/NGN."""
     try:
         payload = {
-            "fiat": "NGN",
-            "page": 1,
-            "rows": 5,
-            "tradeType": "SELL",  # sellers selling USDT for NGN = NGN/USDT rate
-            "asset": "USDT",
-            "countries": [],
-            "proMerchantAds": False,
-            "publisherType": None,
-            "payTypes": [],
+            "fiat": "NGN", "page": 1, "rows": 5,
+            "tradeType": "SELL", "asset": "USDT",
+            "countries": [], "proMerchantAds": False,
+            "publisherType": None, "payTypes": [],
         }
-        headers = {"Content-Type": "application/json"}
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
-            async with s.post(BINANCE_P2P_URL, json=payload, headers=headers) as r:
+            async with s.post(BINANCE_P2P_URL, json=payload,
+                              headers={"Content-Type": "application/json"}) as r:
                 if r.status == 200:
                     data = await r.json()
                     ads = data.get("data", [])
                     if ads:
                         prices = [float(a["adv"]["price"]) for a in ads[:3]]
                         avg = sum(prices) / len(prices)
-                        logger.info(f"Binance P2P rate: {avg:.2f} (avg of {len(prices)} ads)")
+                        logger.info(f"Binance P2P USD/NGN parallel: {avg:.2f}")
                         return avg, "Binance P2P"
     except Exception as e:
         logger.warning(f"Binance P2P fetch failed: {e}")
-
     return None, "mock"
 
-async def get_rates() -> dict:
+async def get_rates(currency="USD") -> dict:
     """
-    Returns dict with cbn_rate, parallel_rate, source.
-    Falls back gracefully.
+    Returns dict with cbn_rate, parallel_rate, source for given currency.
+    Parallel rate only available for USD (via Binance P2P).
+    For GBP/EUR, parallel is estimated from USD parallel spread.
     """
-    official = await fetch_official_rate()
-    parallel, par_source = await fetch_parallel_rate()
+    currency = currency.upper()
+    if currency not in SUPPORTED_CURRENCIES:
+        currency = "USD"
 
-    # Fallback mock values if all sources fail
+    official_usd = await fetch_official_rate("USD")
+    official = await fetch_official_rate(currency) if currency != "USD" else official_usd
+    parallel_usd, par_source = await fetch_parallel_rate_usd()
+
+    # Fallbacks
+    fallbacks = {"USD": 1580.0, "GBP": 2000.0, "EUR": 1720.0}
+    if not official_usd:
+        official_usd = fallbacks["USD"]
     if not official:
-        official = 1580.0  # approximate CBN rate
-    if not parallel:
-        parallel = 1620.0  # approximate parallel rate
+        official = fallbacks.get(currency, 1580.0)
+    if not parallel_usd:
+        parallel_usd = 1620.0
         par_source = "mock"
 
+    # Estimate parallel for non-USD by applying same spread ratio
+    if currency == "USD":
+        parallel = parallel_usd
+    else:
+        spread_ratio = parallel_usd / official_usd
+        parallel = official * spread_ratio
+
     return {
-        "cbn_rate": official,
-        "parallel_rate": parallel,
+        "currency": currency,
+        "cbn_rate": round(official, 2),
+        "parallel_rate": round(parallel, 2),
         "source": f"CBN:exchangerate.host, Parallel:{par_source}",
     }

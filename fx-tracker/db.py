@@ -13,6 +13,7 @@ def init_db():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS rates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                currency TEXT DEFAULT 'USD',
                 cbn_rate REAL,
                 parallel_rate REAL,
                 spread REAL,
@@ -25,49 +26,125 @@ def init_db():
             CREATE TABLE IF NOT EXISTS subscribers (
                 telegram_id INTEGER PRIMARY KEY,
                 username TEXT,
+                active INTEGER DEFAULT 1,
+                alert_threshold_pct REAL DEFAULT 2.0,
+                alert_direction TEXT DEFAULT 'both',
+                briefing_hour INTEGER DEFAULT 8,
                 subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS groups (
+                chat_id INTEGER PRIMARY KEY,
+                title TEXT,
+                active INTEGER DEFAULT 1,
+                briefing_hour INTEGER DEFAULT 8,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         conn.commit()
 
-def save_rate(cbn_rate, parallel_rate, source):
+# ── Rates ─────────────────────────────────────
+
+def save_rate(cbn_rate, parallel_rate, source, currency="USD"):
     spread = parallel_rate - cbn_rate
     spread_pct = (spread / cbn_rate) * 100 if cbn_rate else 0
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO rates (cbn_rate, parallel_rate, spread, spread_pct, source) VALUES (?,?,?,?,?)",
-            (cbn_rate, parallel_rate, spread, spread_pct, source)
+            "INSERT INTO rates (currency, cbn_rate, parallel_rate, spread, spread_pct, source) VALUES (?,?,?,?,?,?)",
+            (currency, cbn_rate, parallel_rate, spread, spread_pct, source)
         )
         conn.commit()
-    return {"cbn_rate": cbn_rate, "parallel_rate": parallel_rate, "spread": spread, "spread_pct": spread_pct}
+    return {"currency": currency, "cbn_rate": cbn_rate, "parallel_rate": parallel_rate,
+            "spread": spread, "spread_pct": spread_pct}
 
-def get_latest_rate():
+def get_latest_rate(currency="USD"):
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM rates ORDER BY fetched_at DESC LIMIT 1").fetchone()
+        row = conn.execute(
+            "SELECT * FROM rates WHERE currency=? ORDER BY fetched_at DESC LIMIT 1", (currency,)
+        ).fetchone()
         return dict(row) if row else None
 
-def get_rate_history(hours=24):
+def get_rate_history(hours=24, currency="USD"):
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT * FROM rates WHERE fetched_at >= datetime('now', ?) ORDER BY fetched_at ASC",
-            (f"-{hours} hours",)
+            "SELECT * FROM rates WHERE currency=? AND fetched_at >= datetime('now', ?) ORDER BY fetched_at ASC",
+            (currency, f"-{hours} hours")
         ).fetchall()
         return [dict(r) for r in rows]
 
+def get_daily_history(days=7, currency="USD"):
+    """Return daily high/low/avg for the past N days."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT date(fetched_at) as day,
+                   MAX(parallel_rate) as high,
+                   MIN(parallel_rate) as low,
+                   AVG(parallel_rate) as avg,
+                   MAX(cbn_rate) as cbn
+            FROM rates
+            WHERE currency=? AND fetched_at >= datetime('now', ?)
+            GROUP BY date(fetched_at)
+            ORDER BY day ASC
+        """, (currency, f"-{days} days")).fetchall()
+        return [dict(r) for r in rows]
+
+# ── Subscribers ───────────────────────────────
+
 def add_subscriber(telegram_id, username):
     with get_conn() as conn:
-        conn.execute(
-            "INSERT OR IGNORE INTO subscribers (telegram_id, username) VALUES (?,?)",
-            (telegram_id, username)
-        )
+        conn.execute("""
+            INSERT INTO subscribers (telegram_id, username, active, alert_threshold_pct, alert_direction, briefing_hour)
+            VALUES (?,?,1,2.0,'both',8)
+            ON CONFLICT(telegram_id) DO UPDATE SET active=1, username=excluded.username
+        """, (telegram_id, username))
         conn.commit()
 
 def remove_subscriber(telegram_id):
     with get_conn() as conn:
-        conn.execute("DELETE FROM subscribers WHERE telegram_id=?", (telegram_id,))
+        conn.execute("UPDATE subscribers SET active=0 WHERE telegram_id=?", (telegram_id,))
         conn.commit()
 
 def get_subscribers():
     with get_conn() as conn:
-        rows = conn.execute("SELECT telegram_id FROM subscribers").fetchall()
-        return [r["telegram_id"] for r in rows]
+        rows = conn.execute("SELECT * FROM subscribers WHERE active=1").fetchall()
+        return [dict(r) for r in rows]
+
+def get_subscriber(telegram_id):
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM subscribers WHERE telegram_id=?", (telegram_id,)).fetchone()
+        return dict(row) if row else None
+
+def update_settings(telegram_id, threshold_pct=None, direction=None, briefing_hour=None):
+    with get_conn() as conn:
+        if threshold_pct is not None:
+            conn.execute("UPDATE subscribers SET alert_threshold_pct=? WHERE telegram_id=?",
+                         (threshold_pct, telegram_id))
+        if direction is not None:
+            conn.execute("UPDATE subscribers SET alert_direction=? WHERE telegram_id=?",
+                         (direction, telegram_id))
+        if briefing_hour is not None:
+            conn.execute("UPDATE subscribers SET briefing_hour=? WHERE telegram_id=?",
+                         (briefing_hour, telegram_id))
+        conn.commit()
+
+# ── Groups ────────────────────────────────────
+
+def register_group(chat_id, title):
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO groups (chat_id, title, active, briefing_hour)
+            VALUES (?,?,1,8)
+            ON CONFLICT(chat_id) DO UPDATE SET active=1, title=excluded.title
+        """, (chat_id, title))
+        conn.commit()
+
+def deregister_group(chat_id):
+    with get_conn() as conn:
+        conn.execute("UPDATE groups SET active=0 WHERE chat_id=?", (chat_id,))
+        conn.commit()
+
+def get_active_groups():
+    with get_conn() as conn:
+        rows = conn.execute("SELECT * FROM groups WHERE active=1").fetchall()
+        return [dict(r) for r in rows]

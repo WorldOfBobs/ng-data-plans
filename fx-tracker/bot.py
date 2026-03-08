@@ -59,10 +59,16 @@ def format_rate(r: dict, currency="USD") -> str:
             kind = KIND_LABEL.get(s.get("kind", ""), "")
             tag = f" _[{kind}]_" if kind else ""
             if s["rate"] is None:
-                lines.append(f"  ⚫ {s['name']}{tag}: unavailable")
+                reason = s.get("err_reason")
+                if reason:
+                    # Known, permanent reason
+                    lines.append(f"  🔒 {s['name']}{tag}: _{reason}_")
+                else:
+                    # Transient failure
+                    lines.append(f"  ❌ {s['name']}{tag}: _no data right now_")
             elif s.get("status") == "outlier" or s.get("reliable") is False:
                 dev = s.get("deviation_pct") or 0
-                lines.append(f"  ⚠️ {s['name']}{tag}: ₦{s['rate']:,.0f} _({dev:.0f}% off — outlier)_")
+                lines.append(f"  ⚠️ {s['name']}{tag}: ₦{s['rate']:,.0f} _({dev:.0f}% off median — excluded)_")
                 has_outlier = True
             else:
                 lines.append(f"  ✅ {s['name']}{tag}: ₦{s['rate']:,.0f}")

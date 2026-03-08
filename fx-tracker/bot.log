@@ -1,10 +1,12 @@
-2026-03-08 14:34:54,519 INFO 🚀 FX Tracker bot starting...
-2026-03-08 14:34:55,061 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getMe "HTTP/1.1 200 OK"
-2026-03-08 14:34:55,063 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-03-08 14:34:55,066 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-03-08 14:34:55,066 INFO Jobs scheduled: poll every 900s, briefing at 7:00 UTC
-2026-03-08 14:34:55,205 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/deleteWebhook "HTTP/1.1 200 OK"
-2026-03-08 14:34:55,206 INFO Added job "job_poll_rates" to job store "default"
-2026-03-08 14:34:55,206 INFO Added job "job_daily_briefing" to job store "default"
-2026-03-08 14:34:55,207 INFO Scheduler started
-2026-03-08 14:34:55,207 INFO Application started
+2026-03-08 14:37:23,014 INFO 🚀 FX Tracker bot starting...
+2026-03-08 14:37:23,449 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getMe "HTTP/1.1 200 OK"
+2026-03-08 14:37:23,451 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-08 14:37:23,454 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-08 14:37:23,454 INFO Jobs scheduled: poll every 900s, briefing at 7:00 UTC
+2026-03-08 14:37:23,586 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/deleteWebhook "HTTP/1.1 200 OK"
+2026-03-08 14:37:23,587 INFO Added job "job_poll_rates" to job store "default"
+2026-03-08 14:37:23,587 INFO Added job "job_daily_briefing" to job store "default"
+2026-03-08 14:37:23,587 INFO Scheduler started
+2026-03-08 14:37:23,587 INFO Application started
+2026-03-08 14:37:33,455 INFO Running job "job_poll_rates (trigger: interval[0:15:00], next run at: 2026-03-08 18:52:33 UTC)" (scheduled at 2026-03-08 18:37:33.450455+00:00)
+2026-03-08 14:37:34,048 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getUpdates "HTTP/1.1 200 OK"

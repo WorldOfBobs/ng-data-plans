@@ -174,21 +174,21 @@ async def _fetch_remitly(currency: str = "USD") -> float | None:
 # ──────────────────────────────────────────────
 
 USD_SOURCES = [
-    ("Bybit P2P",   _fetch_bybit_p2p,             "parallel"),
-    ("Wise",        lambda: _fetch_wise("USD"),    "parallel"),
-    ("open.er-api", _fetch_open_er,                "official"),
-    ("Remitly",     lambda: _fetch_remitly("USD"), "remittance"),
-    ("Binance P2P", _fetch_binance_p2p,            "parallel"),  # geo: works from Nigeria
+    ("Bybit P2P",   _fetch_bybit_p2p,             "parallel",   None),
+    ("Wise",        lambda: _fetch_wise("USD"),    "parallel",   None),
+    ("open.er-api", _fetch_open_er,                "official",   None),
+    ("Remitly",     lambda: _fetch_remitly("USD"), "remittance", None),
+    ("Binance P2P", _fetch_binance_p2p,            "parallel",   "geo-restricted (Nigerian IPs only)"),
 ]
 
 GBP_SOURCES = [
-    ("Wise (GBP)",  lambda: _fetch_wise("GBP"),   "parallel"),
-    ("open.er-api", _fetch_open_er,                "official"),
+    ("Wise (GBP)",  lambda: _fetch_wise("GBP"),   "parallel", None),
+    ("open.er-api", _fetch_open_er,                "official", None),
 ]
 
 EUR_SOURCES = [
-    ("Wise (EUR)",  lambda: _fetch_wise("EUR"),   "parallel"),
-    ("open.er-api", _fetch_open_er,                "official"),
+    ("Wise (EUR)",  lambda: _fetch_wise("EUR"),   "parallel", None),
+    ("open.er-api", _fetch_open_er,                "official", None),
 ]
 
 CURRENCY_SOURCES = {"USD": USD_SOURCES, "GBP": GBP_SOURCES, "EUR": EUR_SOURCES}
@@ -217,11 +217,15 @@ async def get_all_sources(currency: str = "USD") -> dict:
     source_list = CURRENCY_SOURCES.get(currency, USD_SOURCES)
 
     # Fetch all in parallel
-    results = await asyncio.gather(*[fn() for _, fn, _ in source_list], return_exceptions=True)
+    results = await asyncio.gather(*[fn() for _, fn, _, _ in source_list], return_exceptions=True)
 
     raw = {}
-    for (name, _, kind), result in zip(source_list, results):
-        raw[name] = {"rate": result if isinstance(result, float) else None, "kind": kind}
+    for (name, _, kind, err_reason), result in zip(source_list, results):
+        raw[name] = {
+            "rate": result if isinstance(result, float) else None,
+            "kind": kind,
+            "err_reason": err_reason,  # known reason for failure, if any
+        }
 
     live_rates = [v["rate"] for v in raw.values() if v["rate"] is not None]
     logger.info(f"Live sources [{currency}]: { {k: round(v['rate'],2) for k,v in raw.items() if v['rate']} }")
@@ -244,21 +248,25 @@ async def get_all_sources(currency: str = "USD") -> dict:
     # Tag each source
     tagged = []
     for name, info in raw.items():
-        rate, kind = info["rate"], info["kind"]
+        rate, kind, err_reason = info["rate"], info["kind"], info["err_reason"]
         if rate is None:
-            tagged.append({"name": name, "rate": None, "status": "unavailable",
-                           "deviation_pct": None, "kind": kind})
+            tagged.append({
+                "name": name, "rate": None, "status": "unavailable",
+                "deviation_pct": None, "kind": kind,
+                "err_reason": err_reason,  # None = transient failure, str = known reason
+            })
         else:
             dev = abs(rate - med) / med
             tagged.append({
                 "name": name, "rate": rate, "kind": kind,
                 "status": "reliable" if dev <= OUTLIER_THRESHOLD else "outlier",
                 "deviation_pct": round(dev * 100, 1),
+                "err_reason": None,
             })
 
-    # Sort: reliable first, outlier, unavailable last
+    # Sort: reliable first, outlier second, unavailable last
     order = {"reliable": 0, "outlier": 1, "unavailable": 2}
-    tagged.sort(key=lambda s: (order[s["status"]], s["kind"] == "unavailable"))
+    tagged.sort(key=lambda s: (order[s["status"]], s["name"]))
 
     # CBN rate: prefer official sources; fall back to estimating from parallel
     official_rates = [s["rate"] for s in tagged if s["kind"] == "official" and s["rate"] and s["status"] != "outlier"]
@@ -280,7 +288,7 @@ async def get_all_sources(currency: str = "USD") -> dict:
 
     return {
         "currency": currency,
-        "display_sources": tagged[:4],
+        "display_sources": tagged,   # all sources, sorted
         "all_sources": tagged,
         "cbn_rate": cbn,
         "parallel_rate": parallel,

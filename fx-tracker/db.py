@@ -30,6 +30,8 @@ def init_db():
                 alert_threshold_pct REAL DEFAULT 2.0,
                 alert_direction TEXT DEFAULT 'both',
                 briefing_hour INTEGER DEFAULT 8,
+                update_interval_min INTEGER DEFAULT 0,
+                last_interval_push TIMESTAMP DEFAULT NULL,
                 subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -115,7 +117,8 @@ def get_subscriber(telegram_id):
         row = conn.execute("SELECT * FROM subscribers WHERE telegram_id=?", (telegram_id,)).fetchone()
         return dict(row) if row else None
 
-def update_settings(telegram_id, threshold_pct=None, direction=None, briefing_hour=None):
+def update_settings(telegram_id, threshold_pct=None, direction=None, briefing_hour=None,
+                    update_interval_min=None):
     with get_conn() as conn:
         if threshold_pct is not None:
             conn.execute("UPDATE subscribers SET alert_threshold_pct=? WHERE telegram_id=?",
@@ -126,6 +129,33 @@ def update_settings(telegram_id, threshold_pct=None, direction=None, briefing_ho
         if briefing_hour is not None:
             conn.execute("UPDATE subscribers SET briefing_hour=? WHERE telegram_id=?",
                          (briefing_hour, telegram_id))
+        if update_interval_min is not None:
+            conn.execute(
+                "UPDATE subscribers SET update_interval_min=?, last_interval_push=NULL WHERE telegram_id=?",
+                (update_interval_min, telegram_id)
+            )
+        conn.commit()
+
+def get_subscribers_due_interval():
+    """Return subscribers whose interval update is due right now."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT * FROM subscribers
+            WHERE active=1
+              AND update_interval_min > 0
+              AND (
+                last_interval_push IS NULL
+                OR last_interval_push <= datetime('now', '-' || update_interval_min || ' minutes')
+              )
+        """).fetchall()
+        return [dict(r) for r in rows]
+
+def mark_interval_pushed(telegram_id):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE subscribers SET last_interval_push=datetime('now') WHERE telegram_id=?",
+            (telegram_id,)
+        )
         conn.commit()
 
 # ── Groups ────────────────────────────────────

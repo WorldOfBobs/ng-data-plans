@@ -165,7 +165,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "• /rate EUR — Current EUR/NGN rate\n"
         "• /history — 7-day rate trend\n"
         "• /chart — 24-hour chart\n"
-        "• /settings — Your alert settings\n"
+        "• /settings — View all your settings\n"
+        "• /interval — Get rate updates every 15m/1h/6h/etc\n"
         "• /stop — Pause alerts · /subscribe — Resume\n\n"
         "━━━━━━━━━━━━━━\n"
         "🔔 You're subscribed to rate alerts + a daily 8am briefing.\n\n"
@@ -246,15 +247,24 @@ async def cmd_settings(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     hour = sub.get("briefing_hour", 8)
     active = "🔔 On" if sub["active"] else "🔕 Paused"
     dir_label = {"both": "rises & drops 📈📉", "up": "rises only 📈", "down": "drops only 📉"}.get(direction, direction)
+    interval_min = sub.get("update_interval_min", 0)
+    if interval_min == 0:
+        interval_str = "off (alerts only)"
+    elif interval_min < 60:
+        interval_str = f"every {interval_min} minutes"
+    else:
+        interval_str = f"every {interval_min // 60}h" + (f" {interval_min % 60}m" if interval_min % 60 else "")
+
     await update.message.reply_text(
         f"⚙️ *Your Settings*\n\n"
         f"Alerts: {active}\n"
         f"Threshold: *{threshold}%* move triggers alert\n"
         f"Direction: *{dir_label}*\n"
+        f"Rate updates: *{interval_str}*\n"
         f"Daily briefing: *{hour}:00 UTC* ({hour+1}am Lagos)\n\n"
-        f"Change threshold: `/threshold 3`\n"
-        f"Change direction: `/direction up` | `down` | `both`\n"
-        f"Change briefing time: `/briefing 6` (6 UTC = 7am Lagos)",
+        f"Commands to change:\n"
+        f"`/threshold 3` · `/direction up|down|both`\n"
+        f"`/interval 30m|1h|6h|off` · `/briefing 6`",
         parse_mode="Markdown"
     )
 
@@ -280,6 +290,62 @@ async def cmd_direction(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     db.update_settings(update.effective_user.id, direction=val)
     labels = {"both": "all moves 📈📉", "up": "rises only 📈", "down": "drops only 📉"}
     await update.message.reply_text(f"✅ Alerts set to: *{labels[val]}*", parse_mode="Markdown")
+
+INTERVAL_OPTIONS = {
+    "15": 15, "15m": 15,
+    "30": 30, "30m": 30,
+    "1h": 60, "60": 60,
+    "2h": 120,
+    "3h": 180,
+    "6h": 360,
+    "12h": 720,
+    "off": 0, "0": 0,
+}
+
+async def cmd_interval(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not ctx.args:
+        await update.message.reply_text(
+            "⏱ *Proactive Rate Updates*\n\n"
+            "Get the rate pushed to you at a set interval — on top of spike alerts.\n\n"
+            "Options:\n"
+            "`/interval 15m` — every 15 minutes\n"
+            "`/interval 30m` — every 30 minutes\n"
+            "`/interval 1h`  — every hour\n"
+            "`/interval 2h`  — every 2 hours\n"
+            "`/interval 6h`  — every 6 hours\n"
+            "`/interval 12h` — twice a day\n"
+            "`/interval off` — disable (alerts only)\n\n"
+            "_Spike alerts always fire regardless of interval._",
+            parse_mode="Markdown"
+        )
+        return
+
+    key = ctx.args[0].lower().strip()
+    if key not in INTERVAL_OPTIONS:
+        await update.message.reply_text(
+            "❌ Invalid option. Try: `15m`, `30m`, `1h`, `2h`, `6h`, `12h`, or `off`",
+            parse_mode="Markdown"
+        )
+        return
+
+    minutes = INTERVAL_OPTIONS[key]
+    db.update_settings(user.id, update_interval_min=minutes)
+
+    if minutes == 0:
+        await update.message.reply_text(
+            "✅ Proactive updates *off*. You'll still get alerts on big moves.",
+            parse_mode="Markdown"
+        )
+    else:
+        hrs = minutes // 60
+        mins = minutes % 60
+        freq = f"{hrs}h" if hrs and not mins else f"{mins}m" if not hrs else f"{hrs}h {mins}m"
+        await update.message.reply_text(
+            f"✅ I'll push the rate to you every *{freq}*.\n\n"
+            f"Spike alerts still fire instantly regardless.",
+            parse_mode="Markdown"
+        )
 
 async def cmd_briefing_time(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not ctx.args:
@@ -366,6 +432,25 @@ async def job_poll_rates(ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Poll job error: {e}")
 
+async def job_interval_push(ctx: ContextTypes.DEFAULT_TYPE):
+    """Check every 5 min for subscribers whose interval update is due."""
+    due = db.get_subscribers_due_interval()
+    if not due:
+        return
+    # Fetch current rate once for all due subscribers
+    try:
+        rates = await scraper.get_all_sources("USD")
+        rates["fetched_at"] = datetime.utcnow().isoformat()
+        msg = "⏱ *Scheduled Rate Update*\n\n" + format_rate(rates, "USD")
+        for sub in due:
+            try:
+                await ctx.bot.send_message(sub["telegram_id"], msg, parse_mode="Markdown")
+                db.mark_interval_pushed(sub["telegram_id"])
+            except Exception as e:
+                logger.warning(f"Interval push failed for {sub['telegram_id']}: {e}")
+    except Exception as e:
+        logger.error(f"Interval push job error: {e}")
+
 async def job_daily_briefing(ctx: ContextTypes.DEFAULT_TYPE):
     """Send morning briefing to all active subscribers and groups."""
     logger.info("Sending daily briefings...")
@@ -392,12 +477,14 @@ async def job_daily_briefing(ctx: ContextTypes.DEFAULT_TYPE):
 async def post_init(app: Application):
     # Rate polling every 15 min
     app.job_queue.run_repeating(job_poll_rates, interval=POLL_INTERVAL, first=10)
+    # Interval push check every 5 min
+    app.job_queue.run_repeating(job_interval_push, interval=300, first=30)
     # Daily briefing at DAILY_BRIEFING_HOUR UTC
     app.job_queue.run_daily(
         job_daily_briefing,
         time=time(hour=DAILY_BRIEFING_HOUR, minute=0)
     )
-    logger.info(f"Jobs scheduled: poll every {POLL_INTERVAL}s, briefing at {DAILY_BRIEFING_HOUR}:00 UTC")
+    logger.info(f"Jobs scheduled: poll every {POLL_INTERVAL}s, interval-push every 5m, briefing at {DAILY_BRIEFING_HOUR}:00 UTC")
 
 def main():
     db.init_db()
@@ -414,6 +501,7 @@ def main():
     app.add_handler(CommandHandler("threshold", cmd_threshold))
     app.add_handler(CommandHandler("direction", cmd_direction))
     app.add_handler(CommandHandler("briefing", cmd_briefing_time))
+    app.add_handler(CommandHandler("interval", cmd_interval))
 
     # Group events (bot added/removed)
     app.add_handler(ChatMemberHandler(handle_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))

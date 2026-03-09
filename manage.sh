@@ -58,7 +58,7 @@ bot_start() {
   fi
 
   local token; token=$(grep "^BOT_TOKEN=" "$dir/.env" 2>/dev/null | cut -d= -f2- || true)
-  if [[ "$token" == "REPLACE_WITH_"* || -z "$token" ]]; then
+  if [[ "$token" == "REPLACE_WITH_"* || "$token" == "PENDING" || -z "$token" ]]; then
     echo "[$name] ⚠️  Token not set — skipping (edit $dir/.env)"
     return
   fi
@@ -90,7 +90,7 @@ bot_status() {
   local handle; handle=$(grep "^BOT_HANDLE=" "$dir/.env" 2>/dev/null | cut -d= -f2- || true)
   local country; country=$(grep "^DEFAULT_COUNTRY=" "$dir/.env" 2>/dev/null | cut -d= -f2- || true)
 
-  if [[ "$token" == "REPLACE_WITH_"* || -z "$token" ]]; then
+  if [[ "$token" == "REPLACE_WITH_"* || "$token" == "PENDING" || -z "$token" ]]; then
     echo "[$name] ⏳  Token not set yet — needs BotFather  handle=$handle"
     return
   fi

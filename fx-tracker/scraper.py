@@ -20,8 +20,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_FOREIGN = {"USD", "GBP", "EUR"}   # query-side currencies
-SUPPORTED_LOCAL   = {"NGN", "GHS", "KES"}   # target-side local currencies
+SUPPORTED_FOREIGN = {"USD", "GBP", "EUR"}                    # query-side currencies
+SUPPORTED_LOCAL   = {"NGN", "GHS", "KES", "ZAR", "EGP"}    # target-side local currencies
 
 # Backwards compat alias (used in cmd_rate)
 SUPPORTED_CURRENCIES = SUPPORTED_FOREIGN
@@ -32,11 +32,14 @@ REQUEST_TIMEOUT   = aiohttp.ClientTimeout(total=12)
 # Sanity ranges per local currency (USD equivalent so we scale)
 # Stored as (min, max) for the local rate per 1 USD
 RATE_SANITY = {
-    "NGN": (500, 5000),
-    "GHS": (10, 80),
-    "KES": (80, 250),
-    "ZAR": (15, 35),
-    "EGP": (30, 100),
+    "NGN": (500,   5000),
+    "GHS": (10,    80),
+    "KES": (80,    250),
+    "ZAR": (15,    35),
+    "EGP": (30,    100),
+    "ETB": (50,    200),   # Ethiopian Birr
+    "TZS": (2000,  5000),  # Tanzanian Shilling
+    "UGX": (3000,  5000),  # Ugandan Shilling
 }
 
 # ──────────────────────────────────────────────

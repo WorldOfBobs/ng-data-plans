@@ -64,11 +64,11 @@ COUNTRY_CONFIG = {
     "GH": {"name": "Ghana",        "flag": "🇬🇭", "currency": "GHS", "continent": "AF", "live": True,  "bot": "@GhanaFXBot"},
     "KE": {"name": "Kenya",        "flag": "🇰🇪", "currency": "KES", "continent": "AF", "live": True,  "bot": "@KenyaFXBot"},
     # Africa — coming soon
-    "ZA": {"name": "South Africa", "flag": "🇿🇦", "currency": "ZAR", "continent": "AF", "live": False, "bot": ""},
-    "EG": {"name": "Egypt",        "flag": "🇪🇬", "currency": "EGP", "continent": "AF", "live": False, "bot": ""},
-    "ET": {"name": "Ethiopia",     "flag": "🇪🇹", "currency": "ETB", "continent": "AF", "live": False, "bot": ""},
-    "TZ": {"name": "Tanzania",     "flag": "🇹🇿", "currency": "TZS", "continent": "AF", "live": False, "bot": ""},
-    "UG": {"name": "Uganda",       "flag": "🇺🇬", "currency": "UGX", "continent": "AF", "live": False, "bot": ""},
+    "ZA": {"name": "South Africa", "flag": "🇿🇦", "currency": "ZAR", "continent": "AF", "live": True,  "bot": "@SouthAfricaFXBot"},
+    "EG": {"name": "Egypt",        "flag": "🇪🇬", "currency": "EGP", "continent": "AF", "live": False, "bot": "@EgyptFXBot"},
+    "ET": {"name": "Ethiopia",     "flag": "🇪🇹", "currency": "ETB", "continent": "AF", "live": False, "bot": "@EthiopiaFXBot"},
+    "TZ": {"name": "Tanzania",     "flag": "🇹🇿", "currency": "TZS", "continent": "AF", "live": False, "bot": "@TanzaniaFXBot"},
+    "UG": {"name": "Uganda",       "flag": "🇺🇬", "currency": "UGX", "continent": "AF", "live": False, "bot": "@UgandaFXBot"},
     # Asia — coming soon
     "PH": {"name": "Philippines",  "flag": "🇵🇭", "currency": "PHP", "continent": "AS", "live": False, "bot": ""},
     "IN": {"name": "India",        "flag": "🇮🇳", "currency": "INR", "continent": "AS", "live": False, "bot": ""},

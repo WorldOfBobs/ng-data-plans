@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.fxbob.global</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/gravy/dev/nigeria-daily-tools/fx-tracker-global/venv/bin/python3</string>
+    <string>/Users/gravy/dev/nigeria-daily-tools/fx-tracker-global/bot.py</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/gravy/dev/nigeria-daily-tools/fx-tracker-global</string>
+
+  <key>StandardOutPath</key>
+  <string>/Users/gravy/dev/nigeria-daily-tools/fx-tracker-global/bot.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/gravy/dev/nigeria-daily-tools/fx-tracker-global/bot.log</string>
+
+  <!-- Auto-start on login -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Restart on crash -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Wait 5s before restart -->
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+</dict>
+</plist>

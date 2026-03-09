@@ -1,7 +1,10 @@
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "fx_rates.db")
+# DATA_DIR allows multiple bot instances to share one codebase with separate DBs.
+# Set via env: DATA_DIR=/path/to/instances/nigeria
+DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(DATA_DIR, "fx_rates.db")
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH)

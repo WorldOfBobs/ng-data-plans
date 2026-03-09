@@ -1,2 +1,5 @@
 fx-tracker-global/fx_rates.db
 fx-tracker-global/bot.log
+instances/*/fx_rates.db
+instances/*/.bot.pid
+instances/*/bot.log

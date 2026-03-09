@@ -31,16 +31,24 @@ import db
 import scraper
 import chart
 
-load_dotenv()
+# DATA_DIR allows running multiple instances from one codebase.
+# Each instance has its own .env and fx_rates.db in DATA_DIR.
+DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(DATA_DIR, ".env"))
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN       = os.environ["BOT_TOKEN"]
-POLL_INTERVAL   = int(os.getenv("POLL_INTERVAL_SECONDS", "900"))
+BOT_TOKEN           = os.environ["BOT_TOKEN"]
+POLL_INTERVAL       = int(os.getenv("POLL_INTERVAL_SECONDS", "900"))
 DAILY_BRIEFING_HOUR = int(os.getenv("DAILY_BRIEFING_HOUR", "7"))  # 7 UTC = 8am Lagos
 
 # "ALL" = show country picker on /start; any country code = skip straight to that country
 DEFAULT_COUNTRY = os.getenv("DEFAULT_COUNTRY", "NG").upper()
+
+# Cross-marketing handles
+BOT_HANDLE      = os.getenv("BOT_HANDLE", "")       # this bot's own handle, e.g. @NigeriaFXBot
+MAIN_BOT_HANDLE = os.getenv("MAIN_BOT_HANDLE", "")  # umbrella bot, e.g. @FXbob_bot
 
 # Affiliate links
 WISE_AFFILIATE_URL    = os.getenv("WISE_AFFILIATE_URL", "")
@@ -51,19 +59,23 @@ REMITLY_AFFILIATE_URL = os.getenv("REMITLY_AFFILIATE_URL", "")
 # ──────────────────────────────────────────────
 
 COUNTRY_CONFIG = {
-    "NG": {"name": "Nigeria",      "flag": "🇳🇬", "currency": "NGN", "continent": "AF", "live": True},
-    "GH": {"name": "Ghana",        "flag": "🇬🇭", "currency": "GHS", "continent": "AF", "live": True},
-    "KE": {"name": "Kenya",        "flag": "🇰🇪", "currency": "KES", "continent": "AF", "live": True},
-    "ZA": {"name": "South Africa", "flag": "🇿🇦", "currency": "ZAR", "continent": "AF", "live": False},
-    "EG": {"name": "Egypt",        "flag": "🇪🇬", "currency": "EGP", "continent": "AF", "live": False},
-    "ET": {"name": "Ethiopia",     "flag": "🇪🇹", "currency": "ETB", "continent": "AF", "live": False},
-    "TZ": {"name": "Tanzania",     "flag": "🇹🇿", "currency": "TZS", "continent": "AF", "live": False},
-    "UG": {"name": "Uganda",       "flag": "🇺🇬", "currency": "UGX", "continent": "AF", "live": False},
-    "PH": {"name": "Philippines",  "flag": "🇵🇭", "currency": "PHP", "continent": "AS", "live": False},
-    "IN": {"name": "India",        "flag": "🇮🇳", "currency": "INR", "continent": "AS", "live": False},
-    "PK": {"name": "Pakistan",     "flag": "🇵🇰", "currency": "PKR", "continent": "AS", "live": False},
-    "MX": {"name": "Mexico",       "flag": "🇲🇽", "currency": "MXN", "continent": "AM", "live": False},
-    "BR": {"name": "Brazil",       "flag": "🇧🇷", "currency": "BRL", "continent": "AM", "live": False},
+    # Africa — live
+    "NG": {"name": "Nigeria",      "flag": "🇳🇬", "currency": "NGN", "continent": "AF", "live": True,  "bot": "@NigeriaFXBot"},
+    "GH": {"name": "Ghana",        "flag": "🇬🇭", "currency": "GHS", "continent": "AF", "live": True,  "bot": "@GhanaFXBot"},
+    "KE": {"name": "Kenya",        "flag": "🇰🇪", "currency": "KES", "continent": "AF", "live": True,  "bot": "@KenyaFXBot"},
+    # Africa — coming soon
+    "ZA": {"name": "South Africa", "flag": "🇿🇦", "currency": "ZAR", "continent": "AF", "live": False, "bot": ""},
+    "EG": {"name": "Egypt",        "flag": "🇪🇬", "currency": "EGP", "continent": "AF", "live": False, "bot": ""},
+    "ET": {"name": "Ethiopia",     "flag": "🇪🇹", "currency": "ETB", "continent": "AF", "live": False, "bot": ""},
+    "TZ": {"name": "Tanzania",     "flag": "🇹🇿", "currency": "TZS", "continent": "AF", "live": False, "bot": ""},
+    "UG": {"name": "Uganda",       "flag": "🇺🇬", "currency": "UGX", "continent": "AF", "live": False, "bot": ""},
+    # Asia — coming soon
+    "PH": {"name": "Philippines",  "flag": "🇵🇭", "currency": "PHP", "continent": "AS", "live": False, "bot": ""},
+    "IN": {"name": "India",        "flag": "🇮🇳", "currency": "INR", "continent": "AS", "live": False, "bot": ""},
+    "PK": {"name": "Pakistan",     "flag": "🇵🇰", "currency": "PKR", "continent": "AS", "live": False, "bot": ""},
+    # Americas — coming soon
+    "MX": {"name": "Mexico",       "flag": "🇲🇽", "currency": "MXN", "continent": "AM", "live": False, "bot": ""},
+    "BR": {"name": "Brazil",       "flag": "🇧🇷", "currency": "BRL", "continent": "AM", "live": False, "bot": ""},
 }
 
 CONTINENT_CONFIG = {
@@ -160,6 +172,14 @@ def format_rate(r: dict, foreign="USD", local="NGN") -> str:
         elif REMITLY_AFFILIATE_URL:
             lines.extend(["", f"💸 _Send money to Nigeria at the live rate._\n"
                               f"[Send with Remitly →]({REMITLY_AFFILIATE_URL})"])
+
+    # Cross-marketing footer
+    if DEFAULT_COUNTRY != "ALL" and MAIN_BOT_HANDLE:
+        # Country bot → point to global bot
+        lines.extend(["", f"🌍 _Track Ghana, Kenya & more rates → [{MAIN_BOT_HANDLE}](https://t.me/{MAIN_BOT_HANDLE.lstrip('@')})_"])
+    elif DEFAULT_COUNTRY == "ALL":
+        # Global bot → point to country-specific bot if we know user's country
+        pass  # handled per-user in cmd_rate via format_rate_with_country_link()
 
     return "\n".join(lines)
 
@@ -313,10 +333,18 @@ async def callback_picker(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if data.startswith("continent:"):
         continent_code = data.split(":")[1]
         cfg = CONTINENT_CONFIG.get(continent_code, {})
+        # Build list of dedicated country bots for this continent
+        bot_links = [
+            f"{c['flag']} [{c['name']}]({c['bot']})"
+            for c in COUNTRY_CONFIG.values()
+            if c["continent"] == continent_code and c["live"] and c.get("bot")
+        ]
+        bot_line = "\n\n💬 _Country-specific bots: " + " · ".join(bot_links) + "_" if bot_links else ""
         await query.edit_message_text(
-            f"{cfg.get('flag','🌍')} *{cfg.get('name','Region')}* — pick your country:",
+            f"{cfg.get('flag','🌍')} *{cfg.get('name','Region')}* — pick your country:{bot_line}",
             reply_markup=_country_keyboard(continent_code),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            disable_web_page_preview=True,
         )
         return
 
@@ -326,6 +354,15 @@ async def callback_picker(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         db.add_subscriber(user.id, user.username or user.first_name, country_code)
         await query.delete_message()
         await _send_welcome(update.effective_chat.id, user.first_name, country_code, ctx.bot)
+        # If there's a dedicated country bot, nudge the user toward it
+        c = get_country(country_code)
+        if c.get("bot"):
+            await ctx.bot.send_message(
+                update.effective_chat.id,
+                f"💡 _For a faster, country-focused experience, also check out [{c['bot']}](https://t.me/{c['bot'].lstrip('@')}) — dedicated to {c['flag']} {c['name']}._",
+                parse_mode="Markdown",
+                disable_web_page_preview=True,
+            )
         return
 
 async def cmd_country(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

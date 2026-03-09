@@ -1,68 +1,97 @@
 #!/usr/bin/env bash
-# install-services.sh — register FX Bob bots as macOS launch agents
-# They will auto-start on login and restart automatically on crash.
+# install-services.sh — register FX Bob instances as macOS launch agents
+# Auto-starts on login, restarts on crash.
 #
 # Usage:
-#   ./install-services.sh          — install both
-#   ./install-services.sh nigeria  — install only Nigeria bot
-#   ./install-services.sh global   — install only global bot
-#   ./install-services.sh remove   — uninstall both
+#   ./install-services.sh           — install all instances that have a token
+#   ./install-services.sh nigeria   — install one
+#   ./install-services.sh remove    — uninstall all
 
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CORE="$REPO/fx-tracker"
+INST="$REPO/instances"
 LAUNCH_AGENTS="$HOME/Library/LaunchAgents"
+PYTHON="$CORE/venv/bin/python3"
 TARGET="${1:-all}"
 
-install_agent() {
-  local label="$1"
-  local plist="$REPO/launchd/${label}.plist"
-  local dest="$LAUNCH_AGENTS/${label}.plist"
+install_instance() {
+  local name="$1"
+  local dir="$INST/$name"
+  local label="com.fxbob.$name"
+  local dest="$LAUNCH_AGENTS/$label.plist"
 
-  echo "Installing $label…"
-  cp "$plist" "$dest"
+  local token; token=$(grep "^BOT_TOKEN=" "$dir/.env" 2>/dev/null | cut -d= -f2-)
+  if [[ "$token" == "REPLACE_WITH_"* || -z "$token" ]]; then
+    echo "[$name] ⚠️  Token not set — skipping"
+    return
+  fi
+
+  echo "[$name] Installing $label…"
+  cat > "$dest" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$label</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$PYTHON</string>
+    <string>$CORE/bot.py</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DATA_DIR</key>
+    <string>$dir</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>$CORE</string>
+  <key>StandardOutPath</key>
+  <string>$dir/bot.log</string>
+  <key>StandardErrorPath</key>
+  <string>$dir/bot.log</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+</dict>
+</plist>
+EOF
   launchctl unload "$dest" 2>/dev/null || true
   launchctl load -w "$dest"
   echo "  ✅ $label loaded"
 }
 
-remove_agent() {
-  local label="$1"
-  local dest="$LAUNCH_AGENTS/${label}.plist"
-
+remove_instance() {
+  local name="$1"
+  local label="com.fxbob.$name"
+  local dest="$LAUNCH_AGENTS/$label.plist"
   if [[ -f "$dest" ]]; then
-    echo "Removing $label…"
     launchctl unload "$dest" 2>/dev/null || true
     rm -f "$dest"
-    echo "  ✅ $label removed"
-  else
-    echo "  $label not installed, skipping"
+    echo "[$name] ✅ $label removed"
   fi
 }
 
 mkdir -p "$LAUNCH_AGENTS"
 
 case "$TARGET" in
-  all)
-    install_agent "com.fxbob.nigeria"
-    install_agent "com.fxbob.global"
-    ;;
-  nigeria)
-    install_agent "com.fxbob.nigeria"
-    ;;
-  global)
-    install_agent "com.fxbob.global"
-    ;;
   remove)
-    remove_agent "com.fxbob.nigeria"
-    remove_agent "com.fxbob.global"
+    for name in $(ls "$INST"); do remove_instance "$name"; done
     echo "All services removed."
     ;;
+  all)
+    for name in $(ls "$INST"); do install_instance "$name"; done
+    ;;
   *)
-    echo "Usage: $0 [all|nigeria|global|remove]"
-    exit 1
+    install_instance "$TARGET"
     ;;
 esac
 
 echo ""
-echo "Check status with: ./manage.sh status"
+echo "Status: ./manage.sh status"

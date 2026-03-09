@@ -1,6 +1,15 @@
 """
-Nigeria Parallel FX Rate Tracker — Telegram Bot
-Features: live rates (USD/GBP/EUR), alerts, daily briefing, /history, group mode
+FX Bob — Multi-Country Parallel FX Rate Tracker
+Telegram Bot
+
+Features:
+  - Multi-country (Nigeria, Ghana, Kenya — expandable)
+  - Cascading region → country picker on /start (when DEFAULT_COUNTRY=ALL)
+  - Live rates from 5 sources per currency pair
+  - Spike alerts, daily briefing, proactive interval push
+  - /rate, /history, /chart, /settings, /threshold, /direction, /briefing, /interval, /stop, /subscribe
+  - Group mode with daily auto-post
+
 Run: python bot.py
 """
 import asyncio
@@ -9,10 +18,13 @@ import os
 from datetime import datetime, time
 
 from dotenv import load_dotenv
-from telegram import Update, ChatMemberUpdated
+from telegram import (
+    Update, ChatMemberUpdated,
+    InlineKeyboardButton, InlineKeyboardMarkup,
+)
 from telegram.ext import (
     Application, CommandHandler, ContextTypes,
-    ChatMemberHandler, filters, MessageHandler,
+    ChatMemberHandler, CallbackQueryHandler, filters, MessageHandler,
 )
 
 import db
@@ -23,36 +35,88 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ["BOT_TOKEN"]
-POLL_INTERVAL = int(os.getenv("POLL_INTERVAL_SECONDS", "900"))   # 15 min
-DAILY_BRIEFING_HOUR = int(os.getenv("DAILY_BRIEFING_HOUR", "7"))  # 7 UTC = 8am Lagos WAT
+BOT_TOKEN       = os.environ["BOT_TOKEN"]
+POLL_INTERVAL   = int(os.getenv("POLL_INTERVAL_SECONDS", "900"))
+DAILY_BRIEFING_HOUR = int(os.getenv("DAILY_BRIEFING_HOUR", "7"))  # 7 UTC = 8am Lagos
 
-# Affiliate links — set in .env to enable, leave blank to hide
-WISE_AFFILIATE_URL   = os.getenv("WISE_AFFILIATE_URL", "")
+# "ALL" = show country picker on /start; any country code = skip straight to that country
+DEFAULT_COUNTRY = os.getenv("DEFAULT_COUNTRY", "NG").upper()
+
+# Affiliate links
+WISE_AFFILIATE_URL    = os.getenv("WISE_AFFILIATE_URL", "")
 REMITLY_AFFILIATE_URL = os.getenv("REMITLY_AFFILIATE_URL", "")
+
+# ──────────────────────────────────────────────
+# Country / Continent config
+# ──────────────────────────────────────────────
+
+COUNTRY_CONFIG = {
+    "NG": {"name": "Nigeria",      "flag": "🇳🇬", "currency": "NGN", "continent": "AF", "live": True},
+    "GH": {"name": "Ghana",        "flag": "🇬🇭", "currency": "GHS", "continent": "AF", "live": True},
+    "KE": {"name": "Kenya",        "flag": "🇰🇪", "currency": "KES", "continent": "AF", "live": True},
+    "ZA": {"name": "South Africa", "flag": "🇿🇦", "currency": "ZAR", "continent": "AF", "live": False},
+    "EG": {"name": "Egypt",        "flag": "🇪🇬", "currency": "EGP", "continent": "AF", "live": False},
+    "ET": {"name": "Ethiopia",     "flag": "🇪🇹", "currency": "ETB", "continent": "AF", "live": False},
+    "TZ": {"name": "Tanzania",     "flag": "🇹🇿", "currency": "TZS", "continent": "AF", "live": False},
+    "UG": {"name": "Uganda",       "flag": "🇺🇬", "currency": "UGX", "continent": "AF", "live": False},
+    "PH": {"name": "Philippines",  "flag": "🇵🇭", "currency": "PHP", "continent": "AS", "live": False},
+    "IN": {"name": "India",        "flag": "🇮🇳", "currency": "INR", "continent": "AS", "live": False},
+    "PK": {"name": "Pakistan",     "flag": "🇵🇰", "currency": "PKR", "continent": "AS", "live": False},
+    "MX": {"name": "Mexico",       "flag": "🇲🇽", "currency": "MXN", "continent": "AM", "live": False},
+    "BR": {"name": "Brazil",       "flag": "🇧🇷", "currency": "BRL", "continent": "AM", "live": False},
+}
+
+CONTINENT_CONFIG = {
+    "AF": {"name": "Africa",   "flag": "🌍"},
+    "AS": {"name": "Asia",     "flag": "🌏"},
+    "AM": {"name": "Americas", "flag": "🌎"},
+    "EU": {"name": "Europe",   "flag": "🌐"},
+}
+
+def get_country(code: str) -> dict:
+    return COUNTRY_CONFIG.get(code, COUNTRY_CONFIG["NG"])
+
+def user_country_code(sub: dict | None) -> str:
+    """Return the user's country code, respecting DEFAULT_COUNTRY for single-country bots."""
+    if DEFAULT_COUNTRY != "ALL":
+        return DEFAULT_COUNTRY
+    if sub and sub.get("country"):
+        return sub["country"]
+    return "NG"
+
+def user_local_currency(telegram_id: int) -> str:
+    sub = db.get_subscriber(telegram_id)
+    code = user_country_code(sub)
+    return get_country(code)["currency"]
 
 # ──────────────────────────────────────────────
 # Formatting helpers
 # ──────────────────────────────────────────────
 
-CURRENCY_FLAGS = {"USD": "🇺🇸", "GBP": "🇬🇧", "EUR": "🇪🇺"}
+FOREIGN_FLAGS = {"USD": "🇺🇸", "GBP": "🇬🇧", "EUR": "🇪🇺"}
 
-def format_rate(r: dict, currency="USD") -> str:
-    flag = CURRENCY_FLAGS.get(currency, "💵")
+def local_currency_symbol(local: str) -> str:
+    return {"NGN": "₦", "GHS": "₵", "KES": "KSh", "ZAR": "R", "EGP": "£"}.get(local, local + " ")
+
+def format_rate(r: dict, foreign="USD", local="NGN") -> str:
+    fflag = FOREIGN_FLAGS.get(foreign, "💵")
+    sym   = local_currency_symbol(local)
     spread = r.get("spread", r.get("parallel_rate", 0) - r.get("cbn_rate", 0))
     spread_pct = r.get("spread_pct", 0)
     spread_emoji = "🟢" if spread_pct < 5 else "🟡" if spread_pct < 15 else "🔴"
     ts = r.get("fetched_at", "")[:16] or datetime.utcnow().strftime("%Y-%m-%d %H:%M")
 
+    official_label = "CBN Official" if local == "NGN" else "Official Rate"
+    parallel_label = "Parallel Market" if local in ("NGN", "GHS") else "Street/Market"
+
     lines = [
-        f"{flag} *{currency}/NGN Rate* {spread_emoji}",
+        f"{fflag} *{foreign}/{local} Rate* {spread_emoji}",
         "",
-        f"🏦 CBN Official:    ₦{r['cbn_rate']:,.2f}",
-        f"🏪 Parallel Market: ₦{r['parallel_rate']:,.2f}",
-        f"📊 Spread:          ₦{spread:,.2f} ({spread_pct:.1f}%)",
+        f"🏦 {official_label}:    {sym}{r['cbn_rate']:,.2f}",
+        f"🏪 {parallel_label}: {sym}{r['parallel_rate']:,.2f}",
+        f"📊 Spread:             {sym}{spread:,.2f} ({spread_pct:.1f}%)",
     ]
 
-    # Source breakdown
     sources = r.get("display_sources") or r.get("sources")
     if sources:
         lines.append("")
@@ -61,21 +125,19 @@ def format_rate(r: dict, currency="USD") -> str:
         KIND_LABEL = {"parallel": "P2P/market", "official": "official", "remittance": "diaspora"}
         for s in sources:
             kind = KIND_LABEL.get(s.get("kind", ""), "")
-            tag = f" _[{kind}]_" if kind else ""
+            tag  = f" _[{kind}]_" if kind else ""
             if s["rate"] is None:
                 reason = s.get("err_reason")
                 if reason:
-                    # Known, permanent reason
                     lines.append(f"  🔒 {s['name']}{tag}: _{reason}_")
                 else:
-                    # Transient failure
                     lines.append(f"  ❌ {s['name']}{tag}: _no data right now_")
             elif s.get("status") == "outlier" or s.get("reliable") is False:
                 dev = s.get("deviation_pct") or 0
-                lines.append(f"  ⚠️ {s['name']}{tag}: ₦{s['rate']:,.0f} _({dev:.0f}% off median — excluded)_")
+                lines.append(f"  ⚠️ {s['name']}{tag}: {sym}{s['rate']:,.0f} _({dev:.0f}% off median — excluded)_")
                 has_outlier = True
             else:
-                lines.append(f"  ✅ {s['name']}{tag}: ₦{s['rate']:,.0f}")
+                lines.append(f"  ✅ {s['name']}{tag}: {sym}{s['rate']:,.0f}")
 
         if r.get("is_mock"):
             lines.append("")
@@ -87,64 +149,126 @@ def format_rate(r: dict, currency="USD") -> str:
     lines.append("")
     lines.append(f"🕐 {ts} UTC")
 
-    # Affiliate prompt — only shown if URL is configured
-    if WISE_AFFILIATE_URL and currency == "USD":
-        wise_rate = next((s["rate"] for s in (r.get("display_sources") or [])
-                          if "Wise" in s["name"] and s["rate"]), None)
-        rate_str = f"₦{wise_rate:,.0f}/$" if wise_rate else "live rate"
-        lines.append("")
-        lines.append(
-            f"💸 _Sending money to Nigeria? Wise is offering {rate_str} right now._\n"
-            f"[Send with Wise →]({WISE_AFFILIATE_URL})"
-        )
-    elif REMITLY_AFFILIATE_URL and currency == "USD":
-        lines.append("")
-        lines.append(
-            f"💸 _Send money to Nigeria at the live rate._\n"
-            f"[Send with Remitly →]({REMITLY_AFFILIATE_URL})"
-        )
+    # Affiliate prompts (USD→NGN only for now)
+    if foreign == "USD" and local == "NGN":
+        if WISE_AFFILIATE_URL:
+            wise_rate = next((s["rate"] for s in (r.get("display_sources") or [])
+                              if "Wise" in s["name"] and s["rate"]), None)
+            rate_str = f"{sym}{wise_rate:,.0f}/$" if wise_rate else "live rate"
+            lines.extend(["", f"💸 _Sending money to Nigeria? Wise is offering {rate_str} right now._\n"
+                              f"[Send with Wise →]({WISE_AFFILIATE_URL})"])
+        elif REMITLY_AFFILIATE_URL:
+            lines.extend(["", f"💸 _Send money to Nigeria at the live rate._\n"
+                              f"[Send with Remitly →]({REMITLY_AFFILIATE_URL})"])
 
     return "\n".join(lines)
 
-def format_briefing(currency="USD") -> str:
-    r = db.get_latest_rate(currency)
-    history = db.get_daily_history(7, currency)
-    flag = CURRENCY_FLAGS.get(currency, "💵")
+def format_briefing(foreign="USD", local="NGN") -> str:
+    r = db.get_latest_rate(foreign, local)
+    history = db.get_daily_history(7, foreign, local)
+    fflag = FOREIGN_FLAGS.get(foreign, "💵")
+    sym   = local_currency_symbol(local)
     today = datetime.utcnow().strftime("%A, %d %b %Y")
 
     if not r:
-        return f"{flag} *{currency}/NGN Morning Brief* — {today}\n\n_No data yet — check back after the first poll._"
+        return f"{fflag} *{foreign}/{local} Morning Brief* — {today}\n\n_No data yet — check back after the first poll._"
 
-    # Week trend
     trend = ""
     if len(history) >= 2:
-        week_start = history[0]["avg"]
-        week_now = r["parallel_rate"]
-        pct = (week_now - week_start) / week_start * 100
+        pct = (r["parallel_rate"] - history[0]["avg"]) / history[0]["avg"] * 100
         trend = f"📅 vs 7 days ago: {'📈' if pct > 0 else '📉'} {abs(pct):.1f}%\n"
 
     return (
-        f"{flag} *{currency}/NGN Morning Brief* — {today}\n\n"
-        f"🏦 CBN:     ₦{r['cbn_rate']:,.2f}\n"
-        f"🏪 Parallel: ₦{r['parallel_rate']:,.2f}\n"
-        f"📊 Spread:  {r['spread_pct']:.1f}%\n"
+        f"{fflag} *{foreign}/{local} Morning Brief* — {today}\n\n"
+        f"🏦 Official:  {sym}{r['cbn_rate']:,.2f}\n"
+        f"🏪 Market:    {sym}{r['parallel_rate']:,.2f}\n"
+        f"📊 Spread:   {r['spread_pct']:.1f}%\n"
         f"{trend}\n"
         f"_Use /rate for live update · /history for 7-day trend_"
     )
 
-def format_history(currency="USD") -> str:
-    rows = db.get_daily_history(7, currency)
-    flag = CURRENCY_FLAGS.get(currency, "💵")
+def format_history(foreign="USD", local="NGN") -> str:
+    rows = db.get_daily_history(7, foreign, local)
+    fflag = FOREIGN_FLAGS.get(foreign, "💵")
+    sym   = local_currency_symbol(local)
     if not rows:
         return "No history yet — check back after a day of polling."
-    lines = [f"{flag} *{currency}/NGN — Last 7 Days*\n"]
+    lines = [f"{fflag} *{foreign}/{local} — Last 7 Days*\n"]
     for r in rows:
-        day = r["day"][5:]  # MM-DD
+        day = r["day"][5:]
         arrow = "📈" if r["high"] > r["avg"] else "📉"
         lines.append(
-            f"`{day}` {arrow} High: ₦{r['high']:,.0f}  Low: ₦{r['low']:,.0f}  Avg: ₦{r['avg']:,.0f}"
+            f"`{day}` {arrow} High: {sym}{r['high']:,.0f}  Low: {sym}{r['low']:,.0f}  Avg: {sym}{r['avg']:,.0f}"
         )
     return "\n".join(lines)
+
+# ──────────────────────────────────────────────
+# Country picker menus
+# ──────────────────────────────────────────────
+
+def _continent_keyboard():
+    """Level 1: continent buttons."""
+    buttons = []
+    for code, cfg in CONTINENT_CONFIG.items():
+        has_live = any(c["continent"] == code and c["live"] for c in COUNTRY_CONFIG.values())
+        if has_live:
+            buttons.append(InlineKeyboardButton(
+                f"{cfg['flag']} {cfg['name']}", callback_data=f"continent:{code}"
+            ))
+    # Coming soon continents (disabled label)
+    for code, cfg in CONTINENT_CONFIG.items():
+        has_live = any(c["continent"] == code and c["live"] for c in COUNTRY_CONFIG.values())
+        if not has_live:
+            buttons.append(InlineKeyboardButton(
+                f"{cfg['flag']} {cfg['name']} _(soon)_", callback_data="noop"
+            ))
+    # Split into rows of 2
+    rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(rows)
+
+def _country_keyboard(continent_code: str):
+    """Level 2: country buttons for a continent."""
+    buttons = []
+    for code, cfg in COUNTRY_CONFIG.items():
+        if cfg["continent"] != continent_code:
+            continue
+        if cfg["live"]:
+            buttons.append(InlineKeyboardButton(
+                f"{cfg['flag']} {cfg['name']}", callback_data=f"country:{code}"
+            ))
+        else:
+            buttons.append(InlineKeyboardButton(
+                f"{cfg['flag']} {cfg['name']} _(soon)_", callback_data="noop"
+            ))
+    rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+    rows.append([InlineKeyboardButton("← Back", callback_data="picker:start")])
+    return InlineKeyboardMarkup(rows)
+
+async def _send_welcome(chat_id, user_first_name, country_code, bot):
+    """Send the welcome message after country is chosen."""
+    c = get_country(country_code)
+    sym = local_currency_symbol(c["currency"])
+    await bot.send_message(
+        chat_id,
+        f"✅ Set to *{c['flag']} {c['name']}*!\n\n"
+        f"💱 *FX Bob* tracks the official vs parallel {c['currency']} rate "
+        f"and alerts you when it moves — before the bureaux de change catch up.\n\n"
+        "━━━━━━━━━━━━━━\n"
+        "📌 *Commands:*\n\n"
+        "• /rate — Current rate\n"
+        "• /rate GBP — GBP rate\n"
+        "• /rate EUR — EUR rate\n"
+        "• /history — 7-day trend\n"
+        "• /chart — 24-hour chart\n"
+        "• /settings — Your settings\n"
+        "• /interval — Push updates every 15m/1h/6h…\n"
+        "• /country — Change your country\n"
+        "• /stop — Pause · /subscribe — Resume\n\n"
+        "━━━━━━━━━━━━━━\n"
+        f"🔔 Subscribed to rate alerts + daily briefing.\n\n"
+        "_Share with anyone who sends or receives money_ 💸",
+        parse_mode="Markdown"
+    )
 
 # ──────────────────────────────────────────────
 # /start and subscription
@@ -152,25 +276,71 @@ def format_history(currency="USD") -> str:
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    db.add_subscriber(user.id, user.username or user.first_name)
+
+    if DEFAULT_COUNTRY == "ALL":
+        # Multi-country mode: show region picker first
+        await update.message.reply_text(
+            f"👋 Welcome, {user.first_name}!\n\n"
+            "I track the *official vs parallel FX rate* for your country — "
+            "and alert you when it moves.\n\n"
+            "*Choose your region to get started:*",
+            reply_markup=_continent_keyboard(),
+            parse_mode="Markdown"
+        )
+    else:
+        # Single-country mode (e.g. @NigeriaFXBob): skip picker
+        db.add_subscriber(user.id, user.username or user.first_name, DEFAULT_COUNTRY)
+        await _send_welcome(update.effective_chat.id, user.first_name, DEFAULT_COUNTRY, ctx.bot)
+
+async def callback_picker(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Handle inline keyboard taps for continent/country selection."""
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data == "noop":
+        await query.answer("Coming soon! 🚧", show_alert=True)
+        return
+
+    if data == "picker:start":
+        await query.edit_message_text(
+            "Choose your region:",
+            reply_markup=_continent_keyboard(),
+            parse_mode="Markdown"
+        )
+        return
+
+    if data.startswith("continent:"):
+        continent_code = data.split(":")[1]
+        cfg = CONTINENT_CONFIG.get(continent_code, {})
+        await query.edit_message_text(
+            f"{cfg.get('flag','🌍')} *{cfg.get('name','Region')}* — pick your country:",
+            reply_markup=_country_keyboard(continent_code),
+            parse_mode="Markdown"
+        )
+        return
+
+    if data.startswith("country:"):
+        country_code = data.split(":")[1]
+        user = query.from_user
+        db.add_subscriber(user.id, user.username or user.first_name, country_code)
+        await query.delete_message()
+        await _send_welcome(update.effective_chat.id, user.first_name, country_code, ctx.bot)
+        return
+
+async def cmd_country(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Let the user switch countries at any time."""
+    if DEFAULT_COUNTRY != "ALL":
+        c = get_country(DEFAULT_COUNTRY)
+        await update.message.reply_text(
+            f"This bot is fixed to {c['flag']} *{c['name']}*.\n\n"
+            f"For multi-country support, use @FXbob.",
+            parse_mode="Markdown"
+        )
+        return
     await update.message.reply_text(
-        f"👋 Welcome, {user.first_name}!\n\n"
-        "💵 *Nigeria FX Rate Tracker* monitors the USD/NGN rate so you don't have to.\n\n"
-        "I track the *CBN official rate* and the *parallel market rate* and alert you "
-        "whenever there's a significant move — before the bureaux de change catch up.\n\n"
-        "━━━━━━━━━━━━━━\n"
-        "📌 *Commands:*\n\n"
-        "• /rate — Current USD/NGN rate\n"
-        "• /rate GBP — Current GBP/NGN rate\n"
-        "• /rate EUR — Current EUR/NGN rate\n"
-        "• /history — 7-day rate trend\n"
-        "• /chart — 24-hour chart\n"
-        "• /settings — View all your settings\n"
-        "• /interval — Get rate updates every 15m/1h/6h/etc\n"
-        "• /stop — Pause alerts · /subscribe — Resume\n\n"
-        "━━━━━━━━━━━━━━\n"
-        "🔔 You're subscribed to rate alerts + a daily 8am briefing.\n\n"
-        "_Share with anyone who buys or sells dollars_ 🇳🇬",
+        "🌍 *Change your country:*\n\nChoose your region:",
+        reply_markup=_continent_keyboard(),
         parse_mode="Markdown"
     )
 
@@ -182,7 +352,9 @@ async def cmd_stop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_subscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    db.add_subscriber(user.id, user.username or user.first_name)
+    sub  = db.get_subscriber(user.id)
+    country = user_country_code(sub) if sub else DEFAULT_COUNTRY if DEFAULT_COUNTRY != "ALL" else "NG"
+    db.add_subscriber(user.id, user.username or user.first_name, country)
     sub = db.get_subscriber(user.id)
     threshold = sub["alert_threshold_pct"] if sub else 2.0
     direction = sub["alert_direction"] if sub else "both"
@@ -199,35 +371,49 @@ async def cmd_subscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ──────────────────────────────────────────────
 
 async def cmd_rate(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    currency = (ctx.args[0].upper() if ctx.args else "USD")
-    if currency not in scraper.SUPPORTED_CURRENCIES:
-        await update.message.reply_text(f"Supported currencies: USD, GBP, EUR\nExample: `/rate GBP`", parse_mode="Markdown")
+    user = update.effective_user
+    sub  = db.get_subscriber(user.id)
+    local   = get_country(user_country_code(sub))["currency"]
+    foreign = (ctx.args[0].upper() if ctx.args else "USD")
+
+    if foreign not in scraper.SUPPORTED_FOREIGN:
+        await update.message.reply_text(
+            f"Supported foreign currencies: USD, GBP, EUR\nExample: `/rate GBP`",
+            parse_mode="Markdown"
+        )
         return
-    await update.message.reply_text(f"⏳ Fetching {currency}/NGN from all sources...")
+
+    await update.message.reply_text(f"⏳ Fetching {foreign}/{local} from all sources…")
     try:
-        rates = await scraper.get_all_sources(currency)
-        db.save_rate(rates["cbn_rate"], rates["parallel_rate"], rates.get("source", "multi"), currency)
+        rates = await scraper.get_all_sources(foreign, local)
+        db.save_rate(rates["cbn_rate"], rates["parallel_rate"], rates.get("source", "multi"), foreign, local)
         rates["fetched_at"] = datetime.utcnow().isoformat()
-        await update.message.reply_text(format_rate(rates, currency), parse_mode="Markdown")
+        await update.message.reply_text(format_rate(rates, foreign, local), parse_mode="Markdown")
     except Exception as e:
         logger.error(f"Rate fetch error: {e}")
         await update.message.reply_text("❌ Failed to fetch rate. Try again shortly.")
 
 async def cmd_history(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    currency = (ctx.args[0].upper() if ctx.args else "USD")
-    if currency not in scraper.SUPPORTED_CURRENCIES:
-        currency = "USD"
-    await update.message.reply_text(format_history(currency), parse_mode="Markdown")
+    user = update.effective_user
+    sub  = db.get_subscriber(user.id)
+    local   = get_country(user_country_code(sub))["currency"]
+    foreign = (ctx.args[0].upper() if ctx.args else "USD")
+    if foreign not in scraper.SUPPORTED_FOREIGN:
+        foreign = "USD"
+    await update.message.reply_text(format_history(foreign, local), parse_mode="Markdown")
 
 async def cmd_chart(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    currency = (ctx.args[0].upper() if ctx.args else "USD")
-    history = db.get_rate_history(24, currency)
+    user = update.effective_user
+    sub  = db.get_subscriber(user.id)
+    local   = get_country(user_country_code(sub))["currency"]
+    foreign = (ctx.args[0].upper() if ctx.args else "USD")
+    history = db.get_rate_history(24, foreign, local)
     if not history:
         await update.message.reply_text("No history yet — check back after a few polls!")
         return
     png = chart.matplotlib_chart(history)
     if png:
-        await update.message.reply_photo(photo=png, caption=f"📈 {currency}/NGN — last 24 hours")
+        await update.message.reply_photo(photo=png, caption=f"📈 {foreign}/{local} — last 24 hours")
     else:
         ascii_c = chart.ascii_chart(history)
         await update.message.reply_text(f"```\n{ascii_c}\n```", parse_mode="Markdown")
@@ -238,33 +424,39 @@ async def cmd_chart(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_settings(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    sub = db.get_subscriber(user.id)
+    sub  = db.get_subscriber(user.id)
     if not sub:
         await update.message.reply_text("You're not subscribed. Send /start to begin.")
         return
-    threshold = sub["alert_threshold_pct"]
-    direction = sub["alert_direction"]
-    hour = sub.get("briefing_hour", 8)
-    active = "🔔 On" if sub["active"] else "🔕 Paused"
-    dir_label = {"both": "rises & drops 📈📉", "up": "rises only 📈", "down": "drops only 📉"}.get(direction, direction)
+
+    country_code = user_country_code(sub)
+    c = get_country(country_code)
+    threshold    = sub["alert_threshold_pct"]
+    direction    = sub["alert_direction"]
+    hour         = sub.get("briefing_hour", 8)
+    active       = "🔔 On" if sub["active"] else "🔕 Paused"
+    dir_label    = {"both": "rises & drops 📈📉", "up": "rises only 📈", "down": "drops only 📉"}.get(direction, direction)
     interval_min = sub.get("update_interval_min", 0)
-    if interval_min == 0:
-        interval_str = "off (alerts only)"
-    elif interval_min < 60:
-        interval_str = f"every {interval_min} minutes"
-    else:
-        interval_str = f"every {interval_min // 60}h" + (f" {interval_min % 60}m" if interval_min % 60 else "")
+    interval_str = (
+        "off (alerts only)" if interval_min == 0 else
+        f"every {interval_min}m" if interval_min < 60 else
+        f"every {interval_min // 60}h" + (f" {interval_min % 60}m" if interval_min % 60 else "")
+    )
+
+    country_line = f"Country: *{c['flag']} {c['name']}* ({c['currency']})\n" if DEFAULT_COUNTRY == "ALL" else ""
 
     await update.message.reply_text(
         f"⚙️ *Your Settings*\n\n"
+        f"{country_line}"
         f"Alerts: {active}\n"
         f"Threshold: *{threshold}%* move triggers alert\n"
         f"Direction: *{dir_label}*\n"
         f"Rate updates: *{interval_str}*\n"
-        f"Daily briefing: *{hour}:00 UTC* ({hour+1}am Lagos)\n\n"
+        f"Daily briefing: *{hour}:00 UTC*\n\n"
         f"Commands to change:\n"
         f"`/threshold 3` · `/direction up|down|both`\n"
-        f"`/interval 30m|1h|6h|off` · `/briefing 6`",
+        f"`/interval 30m|1h|6h|off` · `/briefing 6`"
+        + ("\n`/country` — switch country" if DEFAULT_COUNTRY == "ALL" else ""),
         parse_mode="Markdown"
     )
 
@@ -292,60 +484,33 @@ async def cmd_direction(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Alerts set to: *{labels[val]}*", parse_mode="Markdown")
 
 INTERVAL_OPTIONS = {
-    "15": 15, "15m": 15,
-    "30": 30, "30m": 30,
-    "1h": 60, "60": 60,
-    "2h": 120,
-    "3h": 180,
-    "6h": 360,
-    "12h": 720,
-    "off": 0, "0": 0,
+    "15": 15, "15m": 15, "30": 30, "30m": 30,
+    "1h": 60, "60": 60, "2h": 120, "3h": 180,
+    "6h": 360, "12h": 720, "off": 0, "0": 0,
 }
 
 async def cmd_interval(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
     if not ctx.args:
         await update.message.reply_text(
             "⏱ *Proactive Rate Updates*\n\n"
-            "Get the rate pushed to you at a set interval — on top of spike alerts.\n\n"
-            "Options:\n"
-            "`/interval 15m` — every 15 minutes\n"
-            "`/interval 30m` — every 30 minutes\n"
-            "`/interval 1h`  — every hour\n"
-            "`/interval 2h`  — every 2 hours\n"
-            "`/interval 6h`  — every 6 hours\n"
-            "`/interval 12h` — twice a day\n"
-            "`/interval off` — disable (alerts only)\n\n"
+            "Get the rate pushed to you at a set interval.\n\n"
+            "`/interval 15m` · `30m` · `1h` · `2h` · `6h` · `12h` · `off`\n\n"
             "_Spike alerts always fire regardless of interval._",
             parse_mode="Markdown"
         )
         return
-
     key = ctx.args[0].lower().strip()
     if key not in INTERVAL_OPTIONS:
-        await update.message.reply_text(
-            "❌ Invalid option. Try: `15m`, `30m`, `1h`, `2h`, `6h`, `12h`, or `off`",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text("❌ Invalid option. Try: `15m`, `30m`, `1h`, `2h`, `6h`, `12h`, or `off`", parse_mode="Markdown")
         return
-
     minutes = INTERVAL_OPTIONS[key]
-    db.update_settings(user.id, update_interval_min=minutes)
-
+    db.update_settings(update.effective_user.id, update_interval_min=minutes)
     if minutes == 0:
-        await update.message.reply_text(
-            "✅ Proactive updates *off*. You'll still get alerts on big moves.",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text("✅ Proactive updates *off*. You'll still get alerts on big moves.", parse_mode="Markdown")
     else:
-        hrs = minutes // 60
-        mins = minutes % 60
+        hrs, mins = minutes // 60, minutes % 60
         freq = f"{hrs}h" if hrs and not mins else f"{mins}m" if not hrs else f"{hrs}h {mins}m"
-        await update.message.reply_text(
-            f"✅ I'll push the rate to you every *{freq}*.\n\n"
-            f"Spike alerts still fire instantly regardless.",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text(f"✅ I'll push the rate every *{freq}*.\n\nSpike alerts still fire instantly.", parse_mode="Markdown")
 
 async def cmd_briefing_time(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not ctx.args:
@@ -358,32 +523,27 @@ async def cmd_briefing_time(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Send an hour 0–23 in UTC. Example: `/briefing 7`", parse_mode="Markdown")
         return
     db.update_settings(update.effective_user.id, briefing_hour=hour)
-    await update.message.reply_text(
-        f"✅ Daily briefing set to *{hour}:00 UTC* ({hour+1}am Lagos time)",
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(f"✅ Daily briefing set to *{hour}:00 UTC*", parse_mode="Markdown")
 
 # ──────────────────────────────────────────────
 # Group mode
 # ──────────────────────────────────────────────
 
 async def handle_chat_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Detect when bot is added to or removed from a group."""
     result: ChatMemberUpdated = update.my_chat_member
     if not result:
         return
     old_status = result.old_chat_member.status
     new_status = result.new_chat_member.status
-    chat = result.chat
+    chat       = result.chat
 
     if new_status in ("member", "administrator") and old_status in ("left", "kicked"):
-        db.register_group(chat.id, chat.title or "Unnamed Group")
+        db.register_group(chat.id, chat.title or "Unnamed Group", DEFAULT_COUNTRY if DEFAULT_COUNTRY != "ALL" else "NG")
         logger.info(f"Bot added to group: {chat.title} ({chat.id})")
         await ctx.bot.send_message(
             chat.id,
-            "👋 *Nigeria FX Rate Tracker is here!*\n\n"
-            "I'll post a daily USD/NGN briefing at 8am Lagos time.\n\n"
-            "Commands work in groups too:\n"
+            "👋 *FX Bob is here!*\n\n"
+            "I'll post a daily FX briefing each morning.\n\n"
             "• /rate — Current rate\n"
             "• /rate GBP · /rate EUR\n"
             "• /history — 7-day trend",
@@ -391,7 +551,6 @@ async def handle_chat_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
     elif new_status in ("left", "kicked"):
         db.deregister_group(chat.id)
-        logger.info(f"Bot removed from group: {chat.title} ({chat.id})")
 
 # ──────────────────────────────────────────────
 # Background jobs
@@ -400,19 +559,21 @@ async def handle_chat_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def job_poll_rates(ctx: ContextTypes.DEFAULT_TYPE):
     """Fetch latest rate, store it, alert subscribers if threshold crossed."""
     try:
-        prev = db.get_latest_rate("USD")
-        rates = await scraper.get_all_sources("USD")
-        saved = db.save_rate(rates["cbn_rate"], rates["parallel_rate"], rates.get("source", "multi"), "USD")
-        saved["fetched_at"] = datetime.utcnow().isoformat()
+        # Poll the default country's currency
+        default_local = get_country(DEFAULT_COUNTRY if DEFAULT_COUNTRY != "ALL" else "NG")["currency"]
+        prev  = db.get_latest_rate("USD", default_local)
+        rates = await scraper.get_all_sources("USD", default_local)
+        saved = db.save_rate(rates["cbn_rate"], rates["parallel_rate"], rates.get("source", "multi"), "USD", default_local)
+        saved["fetched_at"]     = datetime.utcnow().isoformat()
+        saved["display_sources"] = rates.get("display_sources", [])
 
         if prev:
             change_pct = (saved["parallel_rate"] - prev["parallel_rate"]) / prev["parallel_rate"] * 100
-            moved_up = change_pct > 0
+            moved_up   = change_pct > 0
             abs_change = abs(change_pct)
-            direction_label = "📈 UP" if moved_up else "📉 DOWN"
-            alert_msg = (
-                f"🚨 *FX Alert!* Rate moved {direction_label} {abs_change:.1f}%\n\n"
-                + format_rate(saved, "USD")
+            alert_msg  = (
+                f"🚨 *FX Alert!* Rate moved {'📈 UP' if moved_up else '📉 DOWN'} {abs_change:.1f}%\n\n"
+                + format_rate(saved, "USD", default_local)
             )
             for sub in db.get_subscribers():
                 tid = sub["telegram_id"]
@@ -428,43 +589,59 @@ async def job_poll_rates(ctx: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     logger.warning(f"Alert failed for {tid}: {e}")
 
-        logger.info(f"Poll done. USD parallel: ₦{saved['parallel_rate']:,.2f}")
+        logger.info(f"Poll done. USD/{default_local} parallel: {saved['parallel_rate']:,.2f}")
     except Exception as e:
         logger.error(f"Poll job error: {e}")
 
 async def job_interval_push(ctx: ContextTypes.DEFAULT_TYPE):
-    """Check every 5 min for subscribers whose interval update is due."""
+    """Push rate update to subscribers whose interval is due."""
     due = db.get_subscribers_due_interval()
     if not due:
         return
-    # Fetch current rate once for all due subscribers
-    try:
-        rates = await scraper.get_all_sources("USD")
-        rates["fetched_at"] = datetime.utcnow().isoformat()
-        msg = "⏱ *Scheduled Rate Update*\n\n" + format_rate(rates, "USD")
-        for sub in due:
-            try:
-                await ctx.bot.send_message(sub["telegram_id"], msg, parse_mode="Markdown")
-                db.mark_interval_pushed(sub["telegram_id"])
-            except Exception as e:
-                logger.warning(f"Interval push failed for {sub['telegram_id']}: {e}")
-    except Exception as e:
-        logger.error(f"Interval push job error: {e}")
+
+    # Group by local currency so we batch fetches
+    by_currency: dict[str, list] = {}
+    for sub in due:
+        code  = user_country_code(sub)
+        local = get_country(code)["currency"]
+        by_currency.setdefault(local, []).append(sub)
+
+    for local, subs in by_currency.items():
+        try:
+            rates = await scraper.get_all_sources("USD", local)
+            rates["fetched_at"] = datetime.utcnow().isoformat()
+            msg = "⏱ *Scheduled Rate Update*\n\n" + format_rate(rates, "USD", local)
+            for sub in subs:
+                try:
+                    await ctx.bot.send_message(sub["telegram_id"], msg, parse_mode="Markdown")
+                    db.mark_interval_pushed(sub["telegram_id"])
+                except Exception as e:
+                    logger.warning(f"Interval push failed for {sub['telegram_id']}: {e}")
+        except Exception as e:
+            logger.error(f"Interval push job error ({local}): {e}")
 
 async def job_daily_briefing(ctx: ContextTypes.DEFAULT_TYPE):
     """Send morning briefing to all active subscribers and groups."""
-    logger.info("Sending daily briefings...")
-    msg = format_briefing("USD")
+    logger.info("Sending daily briefings…")
 
-    # Individual subscribers
+    # Group subscribers by their local currency
+    by_currency: dict[str, list] = {}
     for sub in db.get_subscribers():
-        try:
-            await ctx.bot.send_message(sub["telegram_id"], msg, parse_mode="Markdown")
-        except Exception as e:
-            logger.warning(f"Briefing failed for {sub['telegram_id']}: {e}")
+        local = get_country(user_country_code(sub))["currency"]
+        by_currency.setdefault(local, []).append(sub)
+
+    for local, subs in by_currency.items():
+        msg = format_briefing("USD", local)
+        for sub in subs:
+            try:
+                await ctx.bot.send_message(sub["telegram_id"], msg, parse_mode="Markdown")
+            except Exception as e:
+                logger.warning(f"Briefing failed for {sub['telegram_id']}: {e}")
 
     # Groups
     for group in db.get_active_groups():
+        local = get_country(group.get("country", "NG"))["currency"]
+        msg = format_briefing("USD", local)
         try:
             await ctx.bot.send_message(group["chat_id"], msg, parse_mode="Markdown")
         except Exception as e:
@@ -475,38 +652,36 @@ async def job_daily_briefing(ctx: ContextTypes.DEFAULT_TYPE):
 # ──────────────────────────────────────────────
 
 async def post_init(app: Application):
-    # Rate polling every 15 min
     app.job_queue.run_repeating(job_poll_rates, interval=POLL_INTERVAL, first=10)
-    # Interval push check every 5 min
     app.job_queue.run_repeating(job_interval_push, interval=300, first=30)
-    # Daily briefing at DAILY_BRIEFING_HOUR UTC
-    app.job_queue.run_daily(
-        job_daily_briefing,
-        time=time(hour=DAILY_BRIEFING_HOUR, minute=0)
-    )
+    app.job_queue.run_daily(job_daily_briefing, time=time(hour=DAILY_BRIEFING_HOUR, minute=0))
     logger.info(f"Jobs scheduled: poll every {POLL_INTERVAL}s, interval-push every 5m, briefing at {DAILY_BRIEFING_HOUR}:00 UTC")
+    logger.info(f"DEFAULT_COUNTRY={DEFAULT_COUNTRY}")
 
 def main():
     db.init_db()
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
 
-    # Commands
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("stop", cmd_stop))
+    app.add_handler(CommandHandler("start",     cmd_start))
+    app.add_handler(CommandHandler("stop",      cmd_stop))
     app.add_handler(CommandHandler("subscribe", cmd_subscribe))
-    app.add_handler(CommandHandler("rate", cmd_rate))
-    app.add_handler(CommandHandler("history", cmd_history))
-    app.add_handler(CommandHandler("chart", cmd_chart))
-    app.add_handler(CommandHandler("settings", cmd_settings))
+    app.add_handler(CommandHandler("country",   cmd_country))
+    app.add_handler(CommandHandler("rate",      cmd_rate))
+    app.add_handler(CommandHandler("history",   cmd_history))
+    app.add_handler(CommandHandler("chart",     cmd_chart))
+    app.add_handler(CommandHandler("settings",  cmd_settings))
     app.add_handler(CommandHandler("threshold", cmd_threshold))
     app.add_handler(CommandHandler("direction", cmd_direction))
-    app.add_handler(CommandHandler("briefing", cmd_briefing_time))
-    app.add_handler(CommandHandler("interval", cmd_interval))
+    app.add_handler(CommandHandler("briefing",  cmd_briefing_time))
+    app.add_handler(CommandHandler("interval",  cmd_interval))
 
-    # Group events (bot added/removed)
+    # Inline keyboard callbacks (country picker)
+    app.add_handler(CallbackQueryHandler(callback_picker))
+
+    # Group events
     app.add_handler(ChatMemberHandler(handle_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
 
-    logger.info("🚀 FX Tracker bot starting...")
+    logger.info("🚀 FX Bob starting…")
     app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":

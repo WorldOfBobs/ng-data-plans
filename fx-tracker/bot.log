@@ -1,12 +1,15 @@
-2026-03-08 16:52:33,853 INFO 🚀 FX Tracker bot starting...
-2026-03-08 16:52:34,261 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getMe "HTTP/1.1 200 OK"
-2026-03-08 16:52:34,264 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-03-08 16:52:34,264 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-03-08 16:52:34,268 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
-2026-03-08 16:52:34,268 INFO Jobs scheduled: poll every 900s, interval-push every 5m, briefing at 7:00 UTC
-2026-03-08 16:52:34,410 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/deleteWebhook "HTTP/1.1 200 OK"
-2026-03-08 16:52:34,411 INFO Added job "job_poll_rates" to job store "default"
-2026-03-08 16:52:34,411 INFO Added job "job_interval_push" to job store "default"
-2026-03-08 16:52:34,411 INFO Added job "job_daily_briefing" to job store "default"
-2026-03-08 16:52:34,411 INFO Scheduler started
-2026-03-08 16:52:34,411 INFO Application started
+2026-03-09 13:37:07,269 INFO 🚀 FX Bob starting…
+2026-03-09 13:37:07,604 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getMe "HTTP/1.1 200 OK"
+2026-03-09 13:37:07,606 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-09 13:37:07,606 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-09 13:37:07,609 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-09 13:37:07,609 INFO Jobs scheduled: poll every 900s, interval-push every 5m, briefing at 7:00 UTC
+2026-03-09 13:37:07,609 INFO DEFAULT_COUNTRY=NG
+2026-03-09 13:37:07,725 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/deleteWebhook "HTTP/1.1 200 OK"
+2026-03-09 13:37:07,726 INFO Added job "job_poll_rates" to job store "default"
+2026-03-09 13:37:07,727 INFO Added job "job_interval_push" to job store "default"
+2026-03-09 13:37:07,727 INFO Added job "job_daily_briefing" to job store "default"
+2026-03-09 13:37:07,727 INFO Scheduler started
+2026-03-09 13:37:07,727 INFO Application started
+2026-03-09 13:37:17,607 INFO Running job "job_poll_rates (trigger: interval[0:15:00], next run at: 2026-03-09 17:52:17 UTC)" (scheduled at 2026-03-09 17:37:17.605317+00:00)
+2026-03-09 13:37:18,041 INFO HTTP Request: POST https://api.telegram.org/bot8722470613:AAEc3Tf3XpvUY3CyEnRMizLEdJQ6yHczTw4/getUpdates "HTTP/1.1 200 OK"

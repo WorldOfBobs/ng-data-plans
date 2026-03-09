@@ -13,7 +13,7 @@ def init_db():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS rates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                currency TEXT DEFAULT 'USD',
+                currency TEXT DEFAULT 'USD/NGN',
                 cbn_rate REAL,
                 parallel_rate REAL,
                 spread REAL,
@@ -32,6 +32,7 @@ def init_db():
                 briefing_hour INTEGER DEFAULT 8,
                 update_interval_min INTEGER DEFAULT 0,
                 last_interval_push TIMESTAMP DEFAULT NULL,
+                country TEXT DEFAULT 'NG',
                 subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -41,14 +42,29 @@ def init_db():
                 title TEXT,
                 active INTEGER DEFAULT 1,
                 briefing_hour INTEGER DEFAULT 8,
+                country TEXT DEFAULT 'NG',
                 added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Migrate existing tables if country column missing
+        _migrate(conn)
         conn.commit()
+
+def _migrate(conn):
+    """Add any missing columns to existing tables (safe to run repeatedly)."""
+    try:
+        conn.execute("ALTER TABLE subscribers ADD COLUMN country TEXT DEFAULT 'NG'")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE groups ADD COLUMN country TEXT DEFAULT 'NG'")
+    except Exception:
+        pass
 
 # ── Rates ─────────────────────────────────────
 
-def save_rate(cbn_rate, parallel_rate, source, currency="USD"):
+def save_rate(cbn_rate, parallel_rate, source, foreign="USD", local="NGN"):
+    currency = f"{foreign}/{local}"
     spread = parallel_rate - cbn_rate
     spread_pct = (spread / cbn_rate) * 100 if cbn_rate else 0
     with get_conn() as conn:
@@ -57,17 +73,20 @@ def save_rate(cbn_rate, parallel_rate, source, currency="USD"):
             (currency, cbn_rate, parallel_rate, spread, spread_pct, source)
         )
         conn.commit()
-    return {"currency": currency, "cbn_rate": cbn_rate, "parallel_rate": parallel_rate,
+    return {"currency": currency, "foreign": foreign, "local": local,
+            "cbn_rate": cbn_rate, "parallel_rate": parallel_rate,
             "spread": spread, "spread_pct": spread_pct}
 
-def get_latest_rate(currency="USD"):
+def get_latest_rate(foreign="USD", local="NGN"):
+    currency = f"{foreign}/{local}"
     with get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM rates WHERE currency=? ORDER BY fetched_at DESC LIMIT 1", (currency,)
         ).fetchone()
         return dict(row) if row else None
 
-def get_rate_history(hours=24, currency="USD"):
+def get_rate_history(hours=24, foreign="USD", local="NGN"):
+    currency = f"{foreign}/{local}"
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM rates WHERE currency=? AND fetched_at >= datetime('now', ?) ORDER BY fetched_at ASC",
@@ -75,8 +94,9 @@ def get_rate_history(hours=24, currency="USD"):
         ).fetchall()
         return [dict(r) for r in rows]
 
-def get_daily_history(days=7, currency="USD"):
+def get_daily_history(days=7, foreign="USD", local="NGN"):
     """Return daily high/low/avg for the past N days."""
+    currency = f"{foreign}/{local}"
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT date(fetched_at) as day,
@@ -93,13 +113,13 @@ def get_daily_history(days=7, currency="USD"):
 
 # ── Subscribers ───────────────────────────────
 
-def add_subscriber(telegram_id, username):
+def add_subscriber(telegram_id, username, country="NG"):
     with get_conn() as conn:
         conn.execute("""
-            INSERT INTO subscribers (telegram_id, username, active, alert_threshold_pct, alert_direction, briefing_hour)
-            VALUES (?,?,1,2.0,'both',8)
+            INSERT INTO subscribers (telegram_id, username, active, alert_threshold_pct, alert_direction, briefing_hour, country)
+            VALUES (?,?,1,2.0,'both',8,?)
             ON CONFLICT(telegram_id) DO UPDATE SET active=1, username=excluded.username
-        """, (telegram_id, username))
+        """, (telegram_id, username, country))
         conn.commit()
 
 def remove_subscriber(telegram_id):
@@ -118,7 +138,7 @@ def get_subscriber(telegram_id):
         return dict(row) if row else None
 
 def update_settings(telegram_id, threshold_pct=None, direction=None, briefing_hour=None,
-                    update_interval_min=None):
+                    update_interval_min=None, country=None):
     with get_conn() as conn:
         if threshold_pct is not None:
             conn.execute("UPDATE subscribers SET alert_threshold_pct=? WHERE telegram_id=?",
@@ -134,10 +154,12 @@ def update_settings(telegram_id, threshold_pct=None, direction=None, briefing_ho
                 "UPDATE subscribers SET update_interval_min=?, last_interval_push=NULL WHERE telegram_id=?",
                 (update_interval_min, telegram_id)
             )
+        if country is not None:
+            conn.execute("UPDATE subscribers SET country=? WHERE telegram_id=?",
+                         (country, telegram_id))
         conn.commit()
 
 def get_subscribers_due_interval():
-    """Return subscribers whose interval update is due right now."""
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT * FROM subscribers
@@ -160,13 +182,13 @@ def mark_interval_pushed(telegram_id):
 
 # ── Groups ────────────────────────────────────
 
-def register_group(chat_id, title):
+def register_group(chat_id, title, country="NG"):
     with get_conn() as conn:
         conn.execute("""
-            INSERT INTO groups (chat_id, title, active, briefing_hour)
-            VALUES (?,?,1,8)
+            INSERT INTO groups (chat_id, title, active, briefing_hour, country)
+            VALUES (?,?,1,8,?)
             ON CONFLICT(chat_id) DO UPDATE SET active=1, title=excluded.title
-        """, (chat_id, title))
+        """, (chat_id, title, country))
         conn.commit()
 
 def deregister_group(chat_id):

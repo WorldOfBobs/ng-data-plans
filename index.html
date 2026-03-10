@@ -152,11 +152,14 @@
 // Tab switching
 // ──────────────────────────────────────────────
 function showTab(name) {
-  document.getElementById('plans-section').style.display    = name==='plans'    ? '' : 'none';
-  document.getElementById('coverage-section').style.display = name==='coverage' ? '' : 'none';
+  document.getElementById('plans-section').style.display    = name==='plans'    ? 'block' : 'none';
+  document.getElementById('coverage-section').style.display = name==='coverage' ? 'block' : 'none';
   document.getElementById('tab-plans').classList.toggle('active',    name==='plans');
   document.getElementById('tab-coverage').classList.toggle('active', name==='coverage');
-  if (name === 'coverage' && !mapInitialized) initMap();
+  if (name === 'coverage') {
+    if (!mapInitialized) initMap();
+    else setTimeout(() => leafletMap && leafletMap.invalidateSize(), 100);
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -289,17 +292,16 @@ const CARRIER_COLOR = {
   '9mobile':'#9933ff',
 };
 
-// Normalize state name for lookup (handles minor name variants in GeoJSON)
+// Normalize GADM NAME_1 values to match COVERAGE keys
 function normalizeName(n) {
   if (!n) return '';
-  n = n.trim();
-  // common replacements
-  const map = {
-    'Federal Capital Territory':'FCT','Abuja':'FCT',
-    'Nassarawa':'Nasarawa','Cross-River':'Cross River',
-    'AkwaIbom':'Akwa Ibom','Akwa-Ibom':'Akwa Ibom',
+  const GADM = {
+    'FederalCapitalTerritory':'FCT',
+    'AkwaIbom':'Akwa Ibom',
+    'CrossRiver':'Cross River',
+    'Nassarawa':'Nasarawa',
   };
-  return map[n] || n;
+  return GADM[n.trim()] || n.trim();
 }
 
 let mapInitialized = false;
@@ -327,12 +329,8 @@ function applyCarrier(carrier) {
   // Restyle all GeoJSON features
   if (geojsonLayer) {
     geojsonLayer.eachLayer(layer => {
-      const raw  = layer.feature.properties;
-      const name = normalizeName(
-        raw.StateName || raw.state || raw.NAME_1 || raw.admin || raw.name || raw.NAME || ''
-      );
+      const name = normalizeName(layer.feature.properties.NAME_1 || '');
       layer.setStyle(getStateStyle(name, carrier));
-      // Update tooltip
       layer.unbindTooltip();
       const level = COVERAGE[carrier]?.[name] ?? 0;
       const levelLabel = level===2?'Excellent 4G/LTE':level===1?'Good 3G/4G':'Limited / 2G only';
@@ -364,29 +362,17 @@ function initMap() {
     pane: 'shadowPane',
   }).addTo(leafletMap);
 
-  // Fetch Nigeria states GeoJSON
-  const GEOJSON_URLS = [
-    'https://raw.githubusercontent.com/benkogan/nigeria-geojson/master/Nigeria_State.geojson',
-    'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/nigeria/nigeria-regions.json',
-  ];
-
-  fetch(GEOJSON_URLS[0])
-    .then(r => { if(!r.ok) throw new Error('primary failed'); return r.json(); })
-    .catch(() => fetch(GEOJSON_URLS[1]).then(r=>r.json()))
+  // Fetch Nigeria states GeoJSON (bundled GADM 4.1 — NAME_1 property)
+  fetch('nigeria-states.geojson')
+    .then(r => { if(!r.ok) throw new Error('fetch failed'); return r.json(); })
     .then(data => {
       geojsonLayer = L.geoJSON(data, {
         style: feature => {
-          const raw  = feature.properties;
-          const name = normalizeName(
-            raw.StateName || raw.state || raw.NAME_1 || raw.admin || raw.name || raw.NAME || ''
-          );
+          const name = normalizeName(feature.properties.NAME_1 || '');
           return getStateStyle(name, activeCarrier);
         },
         onEachFeature: (feature, layer) => {
-          const raw  = feature.properties;
-          const name = normalizeName(
-            raw.StateName || raw.state || raw.NAME_1 || raw.admin || raw.name || raw.NAME || ''
-          );
+          const name = normalizeName(feature.properties.NAME_1 || '');
           const level = COVERAGE[activeCarrier]?.[name] ?? 0;
           const levelLabel = level===2?'Excellent 4G/LTE':level===1?'Good 3G/4G':'Limited / 2G only';
           layer.bindTooltip(`<strong>${name || 'Unknown'}</strong><br/>${levelLabel}`, {sticky:true});

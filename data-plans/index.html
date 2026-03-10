@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nigeria Data Plans & Coverage</title>
+<!-- Google AdSense (add your publisher ID to activate)
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-REPLACE_WITH_YOUR_ID" crossorigin="anonymous"></script>
+-->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
@@ -14,6 +17,21 @@
   .subtitle{text-align:center;color:#888;font-size:.85rem;margin-bottom:12px}
   .updated{text-align:center;color:#555;font-size:.75rem;margin-bottom:18px}
 
+
+  /* ── Promo / affiliate sections ── */
+  .promo-bar{background:linear-gradient(135deg,#1a1a3a,#0f0f24);border:1px solid #2e2e5e;border-radius:14px;padding:18px 20px;margin:24px 0;text-align:center}
+  .promo-bar h3{font-size:1rem;margin-bottom:6px;color:#fff}
+  .promo-bar p{font-size:.8rem;color:#888;margin-bottom:12px}
+  .promo-btn{display:inline-block;padding:9px 20px;border-radius:20px;font-size:.85rem;font-weight:600;text-decoration:none;margin:4px;transition:opacity .2s}
+  .promo-btn:hover{opacity:.85}
+  .jumia-section{background:#111827;border:1px solid #1e2a3a;border-radius:14px;padding:16px 20px;margin:20px 0}
+  .jumia-section h3{font-size:.95rem;margin-bottom:12px;color:#ddd}
+  .carrier-buy-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  .carrier-buy-btn{display:flex;flex-direction:column;align-items:center;padding:10px 16px;border-radius:10px;text-decoration:none;background:#1a1a2e;border:1px solid;transition:opacity .2s;min-width:110px}
+  .carrier-buy-btn:hover{opacity:.8}
+  .carrier-buy-btn span{font-size:.7rem;color:#888;margin-top:3px}
+  .fxbot-bar{background:linear-gradient(135deg,#0a0a1e,#1a1040);border:1px solid #3a2a6e;border-radius:14px;padding:18px 20px;margin:24px 0 8px;text-align:center}
+  .fxbot-bar p{font-size:.82rem;color:#aaa;margin-bottom:10px}
   /* ── Tab bar ── */
   .tabs{display:flex;justify-content:center;margin-bottom:20px}
   .tabs-inner{display:flex;border:1px solid #2e2e4e;border-radius:12px;overflow:hidden}
@@ -114,6 +132,36 @@
   </div>
 
   <div class="grid" id="grid"></div>
+  <!-- ── Carrier buy links ── -->
+  <div class="jumia-section">
+    <h3>🛒 Buy data online or get a new SIM</h3>
+    <div class="carrier-buy-row">
+      <a class="carrier-buy-btn" href="https://www.mtn.ng/internet/data-plans/" target="_blank" rel="noopener" style="border-color:#ffcc00;color:#ffcc00">
+        🟡 MTN <span>Buy data</span>
+      </a>
+      <a class="carrier-buy-btn" href="https://airtel.ng/data-buy/" target="_blank" rel="noopener" style="border-color:#ff3333;color:#ff6666">
+        🔴 Airtel <span>Buy data</span>
+      </a>
+      <a class="carrier-buy-btn" href="https://gloworld.com/ng/" target="_blank" rel="noopener" style="border-color:#33cc33;color:#66ff66">
+        🟢 Glo <span>Buy data</span>
+      </a>
+      <a class="carrier-buy-btn" href="https://www.9mobile.com.ng/data-bundles" target="_blank" rel="noopener" style="border-color:#9933ff;color:#bb77ff">
+        🟣 9mobile <span>Buy data</span>
+      </a>
+      <a class="carrier-buy-btn" href="https://www.jumia.com.ng/catalog/?q=smartphones" target="_blank" rel="noopener" id="jumia-link" style="border-color:#f68b1e;color:#f68b1e">
+        📱 Jumia <span>Shop phones</span>
+      </a>
+    </div>
+    <p style="font-size:.7rem;color:#444;margin-top:10px;text-align:center">Tap to open carrier site · Plans update regularly · Always verify current price before buying</p>
+  </div>
+
+  <!-- ── FXbob promo ── -->
+  <div class="fxbot-bar">
+    <p>💱 Sending money home? Check the real USD→NGN rate before you transfer.</p>
+    <a class="promo-btn" href="https://t.me/FXbob_bot" target="_blank" rel="noopener"
+       style="background:#0088cc;color:#fff">📲 @FXbob_bot on Telegram</a>
+    <p style="font-size:.7rem;color:#555;margin-top:8px">Live official + parallel market rate · Daily alerts · Free</p>
+  </div>
 </div>
 
 <!-- ════════════════ COVERAGE TAB ════════════════ -->

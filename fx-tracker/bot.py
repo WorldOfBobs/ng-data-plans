@@ -57,15 +57,41 @@ WISE_AFFILIATE_URL    = os.getenv("WISE_AFFILIATE_URL", "")
 REMITLY_AFFILIATE_URL = os.getenv("REMITLY_AFFILIATE_URL", "")
 
 # ──────────────────────────────────────────────
-# Country config — only markets with affiliate coverage
+# Region + Country config
 # ──────────────────────────────────────────────
 
-COUNTRY_CONFIG = {
-    "NG": {"name": "Nigeria",      "flag": "🇳🇬", "currency": "NGN"},
-    "GH": {"name": "Ghana",        "flag": "🇬🇭", "currency": "GHS"},
-    "KE": {"name": "Kenya",        "flag": "🇰🇪", "currency": "KES"},
-    "ZA": {"name": "South Africa", "flag": "🇿🇦", "currency": "ZAR"},
+REGION_CONFIG = {
+    "AF_EU": {"name": "Europe & Africa",   "flag": "🌍"},
+    "AM":    {"name": "N. & S. America",   "flag": "🌎"},
+    "AS_AU": {"name": "Asia & Australia",  "flag": "🌏"},
 }
+
+COUNTRY_CONFIG = {
+    # Europe & Africa — live
+    "NG": {"name": "Nigeria",        "flag": "🇳🇬", "currency": "NGN", "region": "AF_EU", "live": True},
+    "GH": {"name": "Ghana",          "flag": "🇬🇭", "currency": "GHS", "region": "AF_EU", "live": True},
+    "KE": {"name": "Kenya",          "flag": "🇰🇪", "currency": "KES", "region": "AF_EU", "live": True},
+    "ZA": {"name": "South Africa",   "flag": "🇿🇦", "currency": "ZAR", "region": "AF_EU", "live": True},
+    # Europe & Africa — coming soon
+    "EG": {"name": "Egypt",          "flag": "🇪🇬", "currency": "EGP", "region": "AF_EU", "live": False},
+    "ET": {"name": "Ethiopia",       "flag": "🇪🇹", "currency": "ETB", "region": "AF_EU", "live": False},
+    "TZ": {"name": "Tanzania",       "flag": "🇹🇿", "currency": "TZS", "region": "AF_EU", "live": False},
+    "UG": {"name": "Uganda",         "flag": "🇺🇬", "currency": "UGX", "region": "AF_EU", "live": False},
+    "GB": {"name": "United Kingdom", "flag": "🇬🇧", "currency": "GBP", "region": "AF_EU", "live": False},
+    # N. & S. America — coming soon
+    "MX": {"name": "Mexico",         "flag": "🇲🇽", "currency": "MXN", "region": "AM",    "live": False},
+    "BR": {"name": "Brazil",         "flag": "🇧🇷", "currency": "BRL", "region": "AM",    "live": False},
+    "CO": {"name": "Colombia",       "flag": "🇨🇴", "currency": "COP", "region": "AM",    "live": False},
+    "DO": {"name": "Dominican Rep.", "flag": "🇩🇴", "currency": "DOP", "region": "AM",    "live": False},
+    # Asia & Australia — coming soon
+    "IN": {"name": "India",          "flag": "🇮🇳", "currency": "INR", "region": "AS_AU", "live": False},
+    "PH": {"name": "Philippines",    "flag": "🇵🇭", "currency": "PHP", "region": "AS_AU", "live": False},
+    "PK": {"name": "Pakistan",       "flag": "🇵🇰", "currency": "PKR", "region": "AS_AU", "live": False},
+    "AU": {"name": "Australia",      "flag": "🇦🇺", "currency": "AUD", "region": "AS_AU", "live": False},
+}
+
+# Only live countries can be selected
+LIVE_COUNTRIES = {k: v for k, v in COUNTRY_CONFIG.items() if v["live"]}
 
 def get_country(code: str) -> dict:
     return COUNTRY_CONFIG.get(code, COUNTRY_CONFIG["NG"])
@@ -90,15 +116,30 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
     is_persistent=True,
 )
 
-def _country_keyboard():
-    """Inline keyboard for country selection (single-level)."""
-    buttons = [
-        InlineKeyboardButton(
-            f"{cfg['flag']} {cfg['name']}", callback_data=f"country:{code}"
-        )
-        for code, cfg in COUNTRY_CONFIG.items()
+def _region_keyboard():
+    """Level 1: 3 region buttons."""
+    rows = [
+        [InlineKeyboardButton(f"{cfg['flag']} {cfg['name']}", callback_data=f"region:{code}")]
+        for code, cfg in REGION_CONFIG.items()
     ]
+    return InlineKeyboardMarkup(rows)
+
+def _country_keyboard(region_code: str):
+    """Level 2: country buttons for a region."""
+    buttons = []
+    for code, cfg in COUNTRY_CONFIG.items():
+        if cfg["region"] != region_code:
+            continue
+        if cfg["live"]:
+            buttons.append(InlineKeyboardButton(
+                f"{cfg['flag']} {cfg['name']}", callback_data=f"country:{code}"
+            ))
+        else:
+            buttons.append(InlineKeyboardButton(
+                f"{cfg['flag']} {cfg['name']} ·soon", callback_data="noop"
+            ))
     rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+    rows.append([InlineKeyboardButton("← Back", callback_data="picker:start")])
     return InlineKeyboardMarkup(rows)
 
 def _send_money_keyboard(foreign: str, local: str) -> InlineKeyboardMarkup | None:
@@ -252,8 +293,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"👋 Welcome, {user.first_name}!\n\n"
             "I track the *official vs parallel FX rate* for your country — "
             "and alert you when it moves.\n\n"
-            "*Pick your country to get started:*",
-            reply_markup=_country_keyboard(),
+            "*Pick your region to get started:*",
+            reply_markup=_region_keyboard(),
             parse_mode="Markdown"
         )
     else:
@@ -261,13 +302,31 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await _send_welcome(update.effective_chat.id, user.first_name, DEFAULT_COUNTRY, ctx.bot)
 
 async def callback_picker(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Handle inline keyboard taps for country selection."""
+    """Handle inline keyboard taps for region → country selection."""
     query = update.callback_query
     await query.answer()
     data = query.data
 
     if data == "noop":
         await query.answer("Coming soon! 🚧", show_alert=True)
+        return
+
+    if data == "picker:start":
+        await query.edit_message_text(
+            "Pick your region:",
+            reply_markup=_region_keyboard(),
+            parse_mode="Markdown"
+        )
+        return
+
+    if data.startswith("region:"):
+        region_code = data.split(":")[1]
+        cfg = REGION_CONFIG.get(region_code, {})
+        await query.edit_message_text(
+            f"{cfg.get('flag','🌍')} *{cfg.get('name','Region')}* — pick your country:",
+            reply_markup=_country_keyboard(region_code),
+            parse_mode="Markdown"
+        )
         return
 
     if data.startswith("country:"):
@@ -288,8 +347,8 @@ async def cmd_country(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
     await update.message.reply_text(
-        "🌍 *Change your country:*",
-        reply_markup=_country_keyboard(),
+        "🌍 *Change your country:*\n\nPick your region:",
+        reply_markup=_region_keyboard(),
         parse_mode="Markdown"
     )
 

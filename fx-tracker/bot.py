@@ -52,10 +52,6 @@ DEFAULT_COUNTRY = os.getenv("DEFAULT_COUNTRY", "NG").upper()
 # Get your own ID by messaging @userinfobot on Telegram
 FEEDBACK_CHAT_ID = os.getenv("FEEDBACK_CHAT_ID", "")
 
-# Affiliate links
-WISE_AFFILIATE_URL    = os.getenv("WISE_AFFILIATE_URL", "")
-REMITLY_AFFILIATE_URL = os.getenv("REMITLY_AFFILIATE_URL", "")
-
 # ──────────────────────────────────────────────
 # Region + Country config
 # ──────────────────────────────────────────────
@@ -142,17 +138,7 @@ def _country_keyboard(region_code: str):
     rows.append([InlineKeyboardButton("← Back", callback_data="picker:start")])
     return InlineKeyboardMarkup(rows)
 
-def _send_money_keyboard(foreign: str, local: str) -> InlineKeyboardMarkup | None:
-    """Inline URL buttons for affiliate 'Send money' links."""
-    buttons = []
-    if WISE_AFFILIATE_URL:
-        buttons.append(InlineKeyboardButton("💸 Send with Wise", url=WISE_AFFILIATE_URL))
-    if REMITLY_AFFILIATE_URL:
-        buttons.append(InlineKeyboardButton("💸 Send with Remitly", url=REMITLY_AFFILIATE_URL))
-    if not buttons:
-        return None
-    # One button per row so URLs are clearly tappable
-    return InlineKeyboardMarkup([[b] for b in buttons])
+
 
 # ──────────────────────────────────────────────
 # Formatting helpers
@@ -398,11 +384,10 @@ async def cmd_rate(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         rates = await scraper.get_all_sources(foreign, local)
         db.save_rate(rates["cbn_rate"], rates["parallel_rate"], rates.get("source", "multi"), foreign, local)
         rates["fetched_at"] = datetime.utcnow().isoformat()
-        money_kb = _send_money_keyboard(foreign, local)
         await update.message.reply_text(
             format_rate(rates, foreign, local),
             parse_mode="Markdown",
-            reply_markup=money_kb,
+            reply_markup=MAIN_KEYBOARD,
         )
     except Exception as e:
         logger.error(f"Rate fetch error: {e}")

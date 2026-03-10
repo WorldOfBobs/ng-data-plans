@@ -170,10 +170,13 @@ def format_rate(r: dict, foreign="USD", local="NGN") -> str:
 
     sources = r.get("display_sources") or r.get("sources")
     if sources:
+        # Sort: parallel first, official second, remittance (Wise/Remitly) last
+        KIND_ORDER = {"parallel": 0, "official": 1, "remittance": 2}
+        sources = sorted(sources, key=lambda s: KIND_ORDER.get(s.get("kind", ""), 1))
         lines.append("")
         lines.append("📡 *Sources:*")
         has_outlier = False
-        KIND_LABEL = {"parallel": "P2P/market", "official": "official", "remittance": "diaspora"}
+        KIND_LABEL = {"parallel": "P2P/market", "official": "official", "remittance": "diaspora send"}
         for s in sources:
             kind = KIND_LABEL.get(s.get("kind", ""), "")
             tag  = f" _[{kind}]_" if kind else ""

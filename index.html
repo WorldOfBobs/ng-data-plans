@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nigeria Data Plans & Coverage</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:#0f0f1a;color:#e0e0e0;font-family:system-ui,-apple-system,sans-serif;min-height:100vh;padding:16px}
@@ -131,22 +133,17 @@
 
   <div class="map-legend" id="map-legend">
     <div class="legend-item">
-      <div class="legend-swatch" id="swatch-excellent"></div>
-      <span>Excellent 4G/LTE</span>
+      <div class="legend-swatch" style="background:#1c1c2e;border:1px solid #333;"></div>
+      <span>No towers</span>
     </div>
     <div class="legend-item">
-      <div class="legend-swatch" id="swatch-good"></div>
-      <span>Good 3G/4G</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-swatch" style="background:#1c1c2e;"></div>
-      <span>Limited / 2G</span>
+      <div class="legend-swatch" id="swatch-heat" style="width:80px;border-radius:4px;"></div>
+      <span>Low → High density</span>
     </div>
   </div>
-  <p class="coverage-note">Coverage data is approximate. Actual signal may vary by location and device.</p>
+  <p class="coverage-note">Source: OpenCelliD · 102,000+ cell tower locations · Last 18 months · Zoom in for city-level detail</p>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ──────────────────────────────────────────────
 // Tab switching
@@ -242,49 +239,9 @@ document.querySelectorAll('.telco-btn').forEach(b=>{
 render();
 
 // ──────────────────────────────────────────────
-// Coverage Map
+// Coverage Map — real OpenCelliD tower density data
 // ──────────────────────────────────────────────
 
-// Per-carrier, per-state coverage levels.
-// 2 = Excellent 4G/LTE  |  1 = Good 3G/4G  |  0 = Limited/2G
-const COVERAGE = {
-  MTN: {
-    'Lagos':2,'FCT':2,'Rivers':2,'Kano':2,'Kaduna':2,'Ogun':2,'Oyo':2,
-    'Anambra':2,'Delta':2,'Plateau':2,'Imo':2,'Enugu':2,'Edo':2,'Kwara':2,
-    'Cross River':2,'Abia':2,'Benue':2,'Akwa Ibom':2,'Ondo':2,'Osun':2,
-    'Ekiti':2,'Kogi':2,'Nasarawa':2,'Ebonyi':2,'Bayelsa':2,
-    'Katsina':1,'Sokoto':1,'Niger':1,'Zamfara':1,'Bauchi':1,'Gombe':1,
-    'Taraba':1,'Adamawa':1,'Kebbi':1,'Jigawa':1,'Yobe':1,'Borno':1,
-  },
-  Airtel: {
-    'Lagos':2,'Rivers':2,'FCT':2,'Ogun':2,'Oyo':2,'Anambra':2,'Delta':2,
-    'Edo':2,'Kaduna':2,'Kano':2,'Imo':2,'Abia':2,'Akwa Ibom':2,
-    'Cross River':2,'Enugu':2,'Benue':2,'Osun':2,'Ondo':2,'Ekiti':2,
-    'Katsina':1,'Niger':1,'Bauchi':1,'Plateau':1,'Ebonyi':1,'Bayelsa':1,
-    'Kwara':1,'Nasarawa':1,'Kogi':1,'Jigawa':1,'Gombe':1,'Adamawa':1,
-    'Taraba':0,'Yobe':0,'Borno':0,'Kebbi':0,'Zamfara':0,'Sokoto':0,
-  },
-  Glo: {
-    'Lagos':2,'FCT':2,'Ogun':2,'Oyo':2,'Rivers':2,'Anambra':2,'Enugu':2,
-    'Kano':2,'Imo':2,
-    'Delta':1,'Edo':1,'Abia':1,'Benue':1,'Plateau':1,'Kwara':1,'Kaduna':1,
-    'Niger':1,'Cross River':1,'Akwa Ibom':1,'Osun':1,'Ondo':1,'Ekiti':1,
-    'Kogi':1,'Nasarawa':1,'Ebonyi':1,'Bayelsa':1,'Katsina':1,'Jigawa':1,
-    'Gombe':1,'Bauchi':1,'Adamawa':1,
-    'Sokoto':0,'Kebbi':0,'Zamfara':0,'Taraba':0,'Yobe':0,'Borno':0,
-  },
-  '9mobile': {
-    'Lagos':2,'FCT':2,'Rivers':2,'Anambra':2,'Enugu':2,'Oyo':2,'Delta':2,
-    'Edo':2,'Imo':2,'Abia':2,
-    'Ogun':1,'Cross River':1,'Akwa Ibom':1,'Benue':1,'Plateau':1,
-    'Kaduna':1,'Kano':1,'Kwara':1,'Kogi':1,'Nasarawa':1,'Ebonyi':1,'Bayelsa':1,
-    'Ondo':1,'Osun':1,'Ekiti':1,
-    'Katsina':0,'Niger':0,'Sokoto':0,'Kebbi':0,'Zamfara':0,'Jigawa':0,
-    'Bauchi':0,'Gombe':0,'Taraba':0,'Adamawa':0,'Yobe':0,'Borno':0,
-  },
-};
-
-// Carrier brand colors
 const CARRIER_COLOR = {
   'MTN':    '#ffcc00',
   'Airtel': '#ff3333',
@@ -292,51 +249,43 @@ const CARRIER_COLOR = {
   '9mobile':'#9933ff',
 };
 
-// Normalize GADM NAME_1 values to match COVERAGE keys
-function normalizeName(n) {
-  if (!n) return '';
-  const GADM = {
-    'FederalCapitalTerritory':'FCT',
-    'AkwaIbom':'Akwa Ibom',
-    'CrossRiver':'Cross River',
-    'Nassarawa':'Nasarawa',
-  };
-  return GADM[n.trim()] || n.trim();
+function hexRGB(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n>>16)&255, (n>>8)&255, n&255];
 }
 
 let mapInitialized = false;
-let leafletMap, geojsonLayer;
+let leafletMap, borderLayer;
+let heatLayers = {};
 let activeCarrier = 'MTN';
-
-function getStateStyle(stateName, carrier) {
-  const level = COVERAGE[carrier]?.[stateName] ?? 0;
-  const hex   = CARRIER_COLOR[carrier];
-  if (level === 2) return { fillColor: hex,    fillOpacity: 0.75, color: '#000', weight: 0.5, opacity: 0.4 };
-  if (level === 1) return { fillColor: hex,    fillOpacity: 0.30, color: '#000', weight: 0.5, opacity: 0.3 };
-  return               { fillColor: '#111827', fillOpacity: 0.80, color: '#000', weight: 0.5, opacity: 0.3 };
-}
 
 function applyCarrier(carrier) {
   activeCarrier = carrier;
   const hex = CARRIER_COLOR[carrier];
+  document.getElementById('swatch-heat').style.background =
+    `linear-gradient(to right, transparent, ${hex})`;
+  Object.entries(heatLayers).forEach(([name, layer]) => {
+    if (name === carrier) layer.addTo(leafletMap);
+    else leafletMap.removeLayer(layer);
+  });
+}
 
-  // Update legend swatches
-  document.getElementById('swatch-excellent').style.background = hex;
-  document.getElementById('swatch-excellent').style.opacity    = '1';
-  document.getElementById('swatch-good').style.background      = hex;
-  document.getElementById('swatch-good').style.opacity         = '0.4';
-
-  // Restyle all GeoJSON features
-  if (geojsonLayer) {
-    geojsonLayer.eachLayer(layer => {
-      const name = normalizeName(layer.feature.properties.NAME_1 || '');
-      layer.setStyle(getStateStyle(name, carrier));
-      layer.unbindTooltip();
-      const level = COVERAGE[carrier]?.[name] ?? 0;
-      const levelLabel = level===2?'Excellent 4G/LTE':level===1?'Good 3G/4G':'Limited / 2G only';
-      layer.bindTooltip(`<strong>${name || 'Unknown'}</strong><br/>${levelLabel}`, {sticky:true});
-    });
-  }
+function buildHeatLayer(carrier, cells) {
+  const [r,g,b] = hexRGB(CARRIER_COLOR[carrier]);
+  const points = cells.map(([lat,lon,v]) => [lat, lon, v/255]);
+  return L.heatLayer(points, {
+    radius: 22,
+    blur: 18,
+    maxZoom: 14,
+    max: 1.0,
+    gradient: {
+      0.0:  'transparent',
+      0.15: `rgba(${r},${g},${b},0.25)`,
+      0.4:  `rgba(${r},${g},${b},0.65)`,
+      0.7:  `rgba(${r},${g},${b},0.88)`,
+      1.0:  `rgba(${r},${g},${b},1)`,
+    },
+  });
 }
 
 function initMap() {
@@ -349,48 +298,32 @@ function initMap() {
     attributionControl: false,
   });
 
-  // Dark tile layer (CartoDB Dark Matter)
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-    maxZoom: 10,
-    subdomains: 'abcd',
+    maxZoom: 14, subdomains: 'abcd',
   }).addTo(leafletMap);
 
-  // City label layer on top
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-    maxZoom: 10,
-    subdomains: 'abcd',
-    pane: 'shadowPane',
-  }).addTo(leafletMap);
-
-  // Fetch Nigeria states GeoJSON (bundled GADM 4.1 — NAME_1 property)
-  fetch('nigeria-states.geojson')
-    .then(r => { if(!r.ok) throw new Error('fetch failed'); return r.json(); })
-    .then(data => {
-      geojsonLayer = L.geoJSON(data, {
-        style: feature => {
-          const name = normalizeName(feature.properties.NAME_1 || '');
-          return getStateStyle(name, activeCarrier);
-        },
-        onEachFeature: (feature, layer) => {
-          const name = normalizeName(feature.properties.NAME_1 || '');
-          const level = COVERAGE[activeCarrier]?.[name] ?? 0;
-          const levelLabel = level===2?'Excellent 4G/LTE':level===1?'Good 3G/4G':'Limited / 2G only';
-          layer.bindTooltip(`<strong>${name || 'Unknown'}</strong><br/>${levelLabel}`, {sticky:true});
-          layer.on('mouseover', function(){ this.setStyle({weight:2,color:'#fff',opacity:.6}); });
-          layer.on('mouseout',  function(){ geojsonLayer.resetStyle(this); applyCarrier(activeCarrier); });
-        }
-      }).addTo(leafletMap);
-
-      // Fit map to Nigeria bounds
-      leafletMap.fitBounds(geojsonLayer.getBounds(), {padding:[10,10]});
-    })
-    .catch(err => {
-      document.getElementById('map').innerHTML =
-        '<p style="color:#555;text-align:center;padding:40px">Map data failed to load.<br>Check your connection and reload.</p>';
+  Promise.all([
+    fetch('ng_coverage_grid.json').then(r => r.json()),
+    fetch('nigeria-states.geojson').then(r => r.json()),
+  ]).then(([grid, states]) => {
+    Object.keys(CARRIER_COLOR).forEach(carrier => {
+      if (grid[carrier]) heatLayers[carrier] = buildHeatLayer(carrier, grid[carrier]);
     });
 
-  // Set initial legend swatches
-  applyCarrier('MTN');
+    borderLayer = L.geoJSON(states, {
+      style: { color: '#ffffff', weight: 0.7, opacity: 0.3, fill: false },
+    }).addTo(leafletMap);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+      maxZoom: 14, subdomains: 'abcd', pane: 'shadowPane',
+    }).addTo(leafletMap);
+
+    leafletMap.fitBounds(borderLayer.getBounds(), {padding:[10,10]});
+    applyCarrier('MTN');
+  }).catch(() => {
+    document.getElementById('map').innerHTML =
+      '<p style="color:#555;text-align:center;padding:40px">Coverage data failed to load.</p>';
+  });
 }
 
 // Carrier toggle buttons
@@ -402,5 +335,3 @@ document.querySelectorAll('.cov-btn').forEach(b => {
   });
 });
 </script>
-</body>
-</html>

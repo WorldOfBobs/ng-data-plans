@@ -1,0 +1,6 @@
+INFO:__main__:🗺️  Nigeria Fuel Map starting on http://localhost:8000
+INFO:     Started server process [24169]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     192.168.1.1:32904 - "GET / HTTP/1.1" 200 OK

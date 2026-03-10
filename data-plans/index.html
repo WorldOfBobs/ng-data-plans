@@ -3,17 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nigeria Data Plan Comparator</title>
+<title>Nigeria Data Plans & Coverage</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:#0f0f1a;color:#e0e0e0;font-family:system-ui,-apple-system,sans-serif;min-height:100vh;padding:16px}
   h1{text-align:center;font-size:1.4rem;margin-bottom:4px;color:#fff}
-  .subtitle{text-align:center;color:#888;font-size:.85rem;margin-bottom:16px}
-  .updated{text-align:center;color:#555;font-size:.75rem;margin-bottom:20px}
+  .subtitle{text-align:center;color:#888;font-size:.85rem;margin-bottom:12px}
+  .updated{text-align:center;color:#555;font-size:.75rem;margin-bottom:18px}
+
+  /* ── Tab bar ── */
+  .tabs{display:flex;justify-content:center;margin-bottom:20px}
+  .tabs-inner{display:flex;border:1px solid #2e2e4e;border-radius:12px;overflow:hidden}
+  .tab-btn{background:#1a1a2e;color:#888;border:none;padding:10px 30px;font-size:.9rem;cursor:pointer;transition:background .2s,color .2s;white-space:nowrap}
+  .tab-btn.active{background:#2d2d50;color:#fff;font-weight:600}
+
+  /* ── Plans tab ── */
   .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;justify-content:center}
   select,button{background:#1e1e30;color:#e0e0e0;border:1px solid #333;border-radius:8px;padding:8px 12px;font-size:.85rem;cursor:pointer}
   select:focus,button:focus{outline:none;border-color:#555}
-  button.active{background:#2d2d50;border-color:#6060c0}
   .sort-row{display:flex;gap:8px;justify-content:center;margin-bottom:20px;flex-wrap:wrap}
   .sort-btn{background:#1a1a2e;border:1px solid #2a2a45;border-radius:20px;color:#aaa;padding:6px 14px;font-size:.8rem}
   .sort-btn.active{background:#2a2a6e;border-color:#5555cc;color:#fff}
@@ -41,143 +49,358 @@
   .no-results{text-align:center;padding:40px;color:#555;grid-column:1/-1}
   .telco-filters{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
   .telco-btn{border-radius:20px;font-size:.8rem;padding:5px 14px;border-width:1px}
+
+  /* ── Coverage tab ── */
+  #coverage-section{display:none}
+  .coverage-carrier-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:16px}
+  .cov-btn{border-radius:20px;font-size:.85rem;padding:7px 18px;border-width:2px;font-weight:600;opacity:.55;transition:opacity .2s,transform .1s}
+  .cov-btn.active{opacity:1;transform:scale(1.06)}
+  #map{height:520px;border-radius:14px;overflow:hidden;border:1px solid #252540}
+  .map-legend{display:flex;gap:18px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:7px;font-size:.8rem;color:#aaa}
+  .legend-swatch{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.1)}
+  .coverage-note{text-align:center;color:#444;font-size:.72rem;margin-top:10px}
+
+  /* Leaflet tooltip override for dark theme */
+  .leaflet-tooltip{background:#1a1a2e;border:1px solid #333;color:#e0e0e0;font-size:.8rem;padding:5px 10px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+  .leaflet-tooltip::before{border-top-color:#333}
 </style>
 </head>
 <body>
 <h1>🇳🇬 Nigeria Data Plans</h1>
-<p class="subtitle">Compare GB-per-naira across all major networks</p>
-<p class="updated">Updated: March 2025 · Tap a card to dial USSD</p>
+<p class="subtitle">Compare GB-per-naira · Check coverage by network</p>
+<p class="updated">Updated: March 2025 · Tap a plan card to dial USSD</p>
 
-<div class="filters">
-  <select id="minData">
-    <option value="0">All sizes</option>
-    <option value="1">≥ 1 GB</option>
-    <option value="5">≥ 5 GB</option>
-    <option value="10">≥ 10 GB</option>
-    <option value="20">≥ 20 GB</option>
-  </select>
-  <select id="maxPrice">
-    <option value="999999">Any price</option>
-    <option value="1000">≤ ₦1,000</option>
-    <option value="2000">≤ ₦2,000</option>
-    <option value="5000">≤ ₦5,000</option>
-  </select>
+<!-- Tab navigation -->
+<div class="tabs">
+  <div class="tabs-inner">
+    <button class="tab-btn active" id="tab-plans" onclick="showTab('plans')">📊 Plans</button>
+    <button class="tab-btn" id="tab-coverage" onclick="showTab('coverage')">🗺️ Coverage Map</button>
+  </div>
 </div>
 
-<div class="telco-filters">
-  <button class="telco-btn active" data-telco="all" style="background:#1e1e30;border-color:#555;color:#fff">All</button>
-  <button class="telco-btn" data-telco="MTN" style="background:#1a1400;border-color:#ffcc00;color:#ffcc00">🟡 MTN</button>
-  <button class="telco-btn" data-telco="Airtel" style="background:#1a0000;border-color:#ff3333;color:#ff6666">🔴 Airtel</button>
-  <button class="telco-btn" data-telco="Glo" style="background:#001a00;border-color:#33cc33;color:#66ff66">🟢 Glo</button>
-  <button class="telco-btn" data-telco="9mobile" style="background:#0a001a;border-color:#9933ff;color:#bb77ff">🟣 9mobile</button>
+<!-- ════════════════ PLANS TAB ════════════════ -->
+<div id="plans-section">
+  <div class="filters">
+    <select id="minData">
+      <option value="0">All sizes</option>
+      <option value="1">≥ 1 GB</option>
+      <option value="5">≥ 5 GB</option>
+      <option value="10">≥ 10 GB</option>
+      <option value="20">≥ 20 GB</option>
+    </select>
+    <select id="maxPrice">
+      <option value="999999">Any price</option>
+      <option value="1000">≤ ₦1,000</option>
+      <option value="2000">≤ ₦2,000</option>
+      <option value="5000">≤ ₦5,000</option>
+    </select>
+  </div>
+
+  <div class="telco-filters">
+    <button class="telco-btn active" data-telco="all" style="background:#1e1e30;border-color:#555;color:#fff">All</button>
+    <button class="telco-btn" data-telco="MTN" style="background:#1a1400;border-color:#ffcc00;color:#ffcc00">🟡 MTN</button>
+    <button class="telco-btn" data-telco="Airtel" style="background:#1a0000;border-color:#ff3333;color:#ff6666">🔴 Airtel</button>
+    <button class="telco-btn" data-telco="Glo" style="background:#001a00;border-color:#33cc33;color:#66ff66">🟢 Glo</button>
+    <button class="telco-btn" data-telco="9mobile" style="background:#0a001a;border-color:#9933ff;color:#bb77ff">🟣 9mobile</button>
+  </div>
+
+  <div class="sort-row">
+    <button class="sort-btn active" data-sort="value">Best value</button>
+    <button class="sort-btn" data-sort="price">Cheapest</button>
+    <button class="sort-btn" data-sort="data">Most data</button>
+  </div>
+
+  <div class="grid" id="grid"></div>
 </div>
 
-<div class="sort-row">
-  <button class="sort-btn active" data-sort="value">Best value</button>
-  <button class="sort-btn" data-sort="price">Cheapest</button>
-  <button class="sort-btn" data-sort="data">Most data</button>
+<!-- ════════════════ COVERAGE TAB ════════════════ -->
+<div id="coverage-section">
+  <div class="coverage-carrier-row">
+    <button class="cov-btn active" data-carrier="MTN"
+      style="background:#1a1400;border-color:#ffcc00;color:#ffcc00">🟡 MTN</button>
+    <button class="cov-btn" data-carrier="Airtel"
+      style="background:#1a0000;border-color:#ff3333;color:#ff6666">🔴 Airtel</button>
+    <button class="cov-btn" data-carrier="Glo"
+      style="background:#001a00;border-color:#33cc33;color:#66ff66">🟢 Glo</button>
+    <button class="cov-btn" data-carrier="9mobile"
+      style="background:#0a001a;border-color:#9933ff;color:#bb77ff">🟣 9mobile</button>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="map-legend" id="map-legend">
+    <div class="legend-item">
+      <div class="legend-swatch" id="swatch-excellent"></div>
+      <span>Excellent 4G/LTE</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" id="swatch-good"></div>
+      <span>Good 3G/4G</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#1c1c2e;"></div>
+      <span>Limited / 2G</span>
+    </div>
+  </div>
+  <p class="coverage-note">Coverage data is approximate. Actual signal may vary by location and device.</p>
 </div>
 
-<div class="grid" id="grid"></div>
-
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const PLANS = [
-  // MTN
-  {telco:"MTN",gb:1,price:1000,days:30,ussd:"*131*1#",color:"#ffcc00"},
-  {telco:"MTN",gb:2,price:2000,days:30,ussd:"*131*1#",color:"#ffcc00"},
-  {telco:"MTN",gb:5,price:3500,days:30,ussd:"*131*1#",color:"#ffcc00"},
-  {telco:"MTN",gb:10,price:5000,days:30,ussd:"*131*1#",color:"#ffcc00"},
-  {telco:"MTN",gb:15,price:6000,days:30,ussd:"*131*1#",color:"#ffcc00"},
-  // Airtel
-  {telco:"Airtel",gb:1,price:1000,days:30,ussd:"*141*712*0#",color:"#ff3333"},
-  {telco:"Airtel",gb:2,price:1500,days:30,ussd:"*141*712*0#",color:"#ff3333"},
-  {telco:"Airtel",gb:5,price:3000,days:30,ussd:"*141*712*0#",color:"#ff3333"},
-  {telco:"Airtel",gb:10,price:5000,days:30,ussd:"*141*712*0#",color:"#ff3333"},
-  {telco:"Airtel",gb:20,price:8000,days:30,ussd:"*141*712*0#",color:"#ff3333"},
-  // Glo
-  {telco:"Glo",gb:1.35,price:500,days:14,ussd:"*777#",color:"#33cc33"},
-  {telco:"Glo",gb:2.9,price:1000,days:30,ussd:"*777#",color:"#33cc33"},
-  {telco:"Glo",gb:7.7,price:2000,days:30,ussd:"*777#",color:"#33cc33"},
-  {telco:"Glo",gb:15,price:3000,days:30,ussd:"*777#",color:"#33cc33"},
-  {telco:"Glo",gb:29.5,price:5000,days:30,ussd:"*777#",color:"#33cc33"},
-  // 9mobile
-  {telco:"9mobile",gb:1,price:1000,days:30,ussd:"*229*2*1#",color:"#9933ff"},
-  {telco:"9mobile",gb:2.5,price:2000,days:30,ussd:"*229*2*1#",color:"#9933ff"},
-  {telco:"9mobile",gb:11.5,price:4000,days:30,ussd:"*229*2*1#",color:"#9933ff"},
-  {telco:"9mobile",gb:22,price:8000,days:30,ussd:"*229*2*1#",color:"#9933ff"},
-];
+// ──────────────────────────────────────────────
+// Tab switching
+// ──────────────────────────────────────────────
+function showTab(name) {
+  document.getElementById('plans-section').style.display    = name==='plans'    ? 'block' : 'none';
+  document.getElementById('coverage-section').style.display = name==='coverage' ? 'block' : 'none';
+  document.getElementById('tab-plans').classList.toggle('active',    name==='plans');
+  document.getElementById('tab-coverage').classList.toggle('active', name==='coverage');
+  if (name === 'coverage') {
+    if (!mapInitialized) initMap();
+    else setTimeout(() => leafletMap && leafletMap.invalidateSize(), 100);
+  }
+}
 
-// compute value: MB per ₦100
+// ──────────────────────────────────────────────
+// Plans data
+// ──────────────────────────────────────────────
+const PLANS = [
+  {telco:"MTN",   gb:1,    price:1000, days:30, ussd:"*131*1#",      color:"#ffcc00"},
+  {telco:"MTN",   gb:2,    price:2000, days:30, ussd:"*131*1#",      color:"#ffcc00"},
+  {telco:"MTN",   gb:5,    price:3500, days:30, ussd:"*131*1#",      color:"#ffcc00"},
+  {telco:"MTN",   gb:10,   price:5000, days:30, ussd:"*131*1#",      color:"#ffcc00"},
+  {telco:"MTN",   gb:15,   price:6000, days:30, ussd:"*131*1#",      color:"#ffcc00"},
+  {telco:"Airtel",gb:1,    price:1000, days:30, ussd:"*141*712*0#",  color:"#ff3333"},
+  {telco:"Airtel",gb:2,    price:1500, days:30, ussd:"*141*712*0#",  color:"#ff3333"},
+  {telco:"Airtel",gb:5,    price:3000, days:30, ussd:"*141*712*0#",  color:"#ff3333"},
+  {telco:"Airtel",gb:10,   price:5000, days:30, ussd:"*141*712*0#",  color:"#ff3333"},
+  {telco:"Airtel",gb:20,   price:8000, days:30, ussd:"*141*712*0#",  color:"#ff3333"},
+  {telco:"Glo",   gb:1.35, price:500,  days:14, ussd:"*777#",        color:"#33cc33"},
+  {telco:"Glo",   gb:2.9,  price:1000, days:30, ussd:"*777#",        color:"#33cc33"},
+  {telco:"Glo",   gb:7.7,  price:2000, days:30, ussd:"*777#",        color:"#33cc33"},
+  {telco:"Glo",   gb:15,   price:3000, days:30, ussd:"*777#",        color:"#33cc33"},
+  {telco:"Glo",   gb:29.5, price:5000, days:30, ussd:"*777#",        color:"#33cc33"},
+  {telco:"9mobile",gb:1,   price:1000, days:30, ussd:"*229*2*1#",    color:"#9933ff"},
+  {telco:"9mobile",gb:2.5, price:2000, days:30, ussd:"*229*2*1#",    color:"#9933ff"},
+  {telco:"9mobile",gb:11.5,price:4000, days:30, ussd:"*229*2*1#",    color:"#9933ff"},
+  {telco:"9mobile",gb:22,  price:8000, days:30, ussd:"*229*2*1#",    color:"#9933ff"},
+];
 PLANS.forEach(p => { p.value = (p.gb * 1024) / (p.price / 100); });
 const maxVal = Math.max(...PLANS.map(p=>p.value));
 
-let sortBy = "value";
-let filterTelco = "all";
+let sortBy='value', filterTelco='all';
 
-function tier(p) {
-  const ratio = p.value / maxVal;
-  if (ratio >= 0.75) return "best";
-  if (ratio >= 0.4) return "good";
-  return "poor";
+function tier(p){
+  const r=p.value/maxVal;
+  return r>=0.75?'best':r>=0.4?'good':'poor';
 }
-function tierLabel(t) {
-  if (t==="best") return "Best Value";
-  if (t==="good") return "Good";
-  return "Low Value";
-}
+function tierLabel(t){return t==='best'?'Best Value':t==='good'?'Good':'Low Value';}
 
-function render() {
-  const minGb = parseFloat(document.getElementById("minData").value);
-  const maxP  = parseFloat(document.getElementById("maxPrice").value);
-  let plans = PLANS.filter(p => p.gb >= minGb && p.price <= maxP);
-  if (filterTelco !== "all") plans = plans.filter(p => p.telco === filterTelco);
-  if (sortBy === "value") plans.sort((a,b) => b.value - a.value);
-  if (sortBy === "price") plans.sort((a,b) => a.price - b.price);
-  if (sortBy === "data")  plans.sort((a,b) => b.gb - a.gb);
-
-  const grid = document.getElementById("grid");
-  if (!plans.length) { grid.innerHTML = '<p class="no-results">No plans match your filters</p>'; return; }
-
-  grid.innerHTML = plans.map(p => {
-    const t = tier(p);
-    const fill = Math.round((p.value / maxVal) * 100);
-    const fillColor = t==="best"?"#ffd700":t==="good"?"#3a9a3a":"#6a2020";
-    const gbDisplay = Number.isInteger(p.gb) ? p.gb : p.gb.toFixed(2);
+function render(){
+  const minGb=parseFloat(document.getElementById('minData').value);
+  const maxP =parseFloat(document.getElementById('maxPrice').value);
+  let plans=PLANS.filter(p=>p.gb>=minGb&&p.price<=maxP);
+  if(filterTelco!=='all') plans=plans.filter(p=>p.telco===filterTelco);
+  if(sortBy==='value') plans.sort((a,b)=>b.value-a.value);
+  if(sortBy==='price') plans.sort((a,b)=>a.price-b.price);
+  if(sortBy==='data')  plans.sort((a,b)=>b.gb-a.gb);
+  const grid=document.getElementById('grid');
+  if(!plans.length){grid.innerHTML='<p class="no-results">No plans match your filters</p>';return;}
+  grid.innerHTML=plans.map(p=>{
+    const t=tier(p);
+    const fill=Math.round((p.value/maxVal)*100);
+    const fillColor=t==='best'?'#ffd700':t==='good'?'#3a9a3a':'#6a2020';
+    const gbDisplay=Number.isInteger(p.gb)?p.gb:p.gb.toFixed(2);
     return `<div class="card ${t}" onclick="location.href='tel:${p.ussd}'" style="cursor:pointer">
       <span class="badge ${t}">${tierLabel(t)}</span>
-      <div class="telco">
-        <div class="telco-dot" style="background:${p.color}"></div>
-        <span class="telco-name">${p.telco}</span>
-      </div>
+      <div class="telco"><div class="telco-dot" style="background:${p.color}"></div>
+      <span class="telco-name">${p.telco}</span></div>
       <div class="plan-gb">${gbDisplay}<span> GB</span></div>
       <div class="plan-price">₦${p.price.toLocaleString()}</div>
       <div class="plan-days">${p.days} days · Tap to dial ${p.ussd}</div>
       <div class="value-bar"><div class="value-fill" style="width:${fill}%;background:${fillColor}"></div></div>
       <div class="value-score">${Math.round(p.value)} MB per ₦100 spent</div>
     </div>`;
-  }).join("");
+  }).join('');
 }
 
-document.getElementById("minData").addEventListener("change", render);
-document.getElementById("maxPrice").addEventListener("change", render);
-document.querySelectorAll(".sort-btn").forEach(b => {
-  b.addEventListener("click", () => {
-    document.querySelectorAll(".sort-btn").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active");
-    sortBy = b.dataset.sort;
-    render();
+document.getElementById('minData').addEventListener('change',render);
+document.getElementById('maxPrice').addEventListener('change',render);
+document.querySelectorAll('.sort-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.sort-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); sortBy=b.dataset.sort; render();
   });
 });
-document.querySelectorAll(".telco-btn").forEach(b => {
-  b.addEventListener("click", () => {
-    document.querySelectorAll(".telco-btn").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active");
-    filterTelco = b.dataset.telco;
-    render();
+document.querySelectorAll('.telco-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.telco-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); filterTelco=b.dataset.telco; render();
   });
 });
-
 render();
+
+// ──────────────────────────────────────────────
+// Coverage Map
+// ──────────────────────────────────────────────
+
+// Per-carrier, per-state coverage levels.
+// 2 = Excellent 4G/LTE  |  1 = Good 3G/4G  |  0 = Limited/2G
+const COVERAGE = {
+  MTN: {
+    'Lagos':2,'FCT':2,'Rivers':2,'Kano':2,'Kaduna':2,'Ogun':2,'Oyo':2,
+    'Anambra':2,'Delta':2,'Plateau':2,'Imo':2,'Enugu':2,'Edo':2,'Kwara':2,
+    'Cross River':2,'Abia':2,'Benue':2,'Akwa Ibom':2,'Ondo':2,'Osun':2,
+    'Ekiti':2,'Kogi':2,'Nasarawa':2,'Ebonyi':2,'Bayelsa':2,
+    'Katsina':1,'Sokoto':1,'Niger':1,'Zamfara':1,'Bauchi':1,'Gombe':1,
+    'Taraba':1,'Adamawa':1,'Kebbi':1,'Jigawa':1,'Yobe':1,'Borno':1,
+  },
+  Airtel: {
+    'Lagos':2,'Rivers':2,'FCT':2,'Ogun':2,'Oyo':2,'Anambra':2,'Delta':2,
+    'Edo':2,'Kaduna':2,'Kano':2,'Imo':2,'Abia':2,'Akwa Ibom':2,
+    'Cross River':2,'Enugu':2,'Benue':2,'Osun':2,'Ondo':2,'Ekiti':2,
+    'Katsina':1,'Niger':1,'Bauchi':1,'Plateau':1,'Ebonyi':1,'Bayelsa':1,
+    'Kwara':1,'Nasarawa':1,'Kogi':1,'Jigawa':1,'Gombe':1,'Adamawa':1,
+    'Taraba':0,'Yobe':0,'Borno':0,'Kebbi':0,'Zamfara':0,'Sokoto':0,
+  },
+  Glo: {
+    'Lagos':2,'FCT':2,'Ogun':2,'Oyo':2,'Rivers':2,'Anambra':2,'Enugu':2,
+    'Kano':2,'Imo':2,
+    'Delta':1,'Edo':1,'Abia':1,'Benue':1,'Plateau':1,'Kwara':1,'Kaduna':1,
+    'Niger':1,'Cross River':1,'Akwa Ibom':1,'Osun':1,'Ondo':1,'Ekiti':1,
+    'Kogi':1,'Nasarawa':1,'Ebonyi':1,'Bayelsa':1,'Katsina':1,'Jigawa':1,
+    'Gombe':1,'Bauchi':1,'Adamawa':1,
+    'Sokoto':0,'Kebbi':0,'Zamfara':0,'Taraba':0,'Yobe':0,'Borno':0,
+  },
+  '9mobile': {
+    'Lagos':2,'FCT':2,'Rivers':2,'Anambra':2,'Enugu':2,'Oyo':2,'Delta':2,
+    'Edo':2,'Imo':2,'Abia':2,
+    'Ogun':1,'Cross River':1,'Akwa Ibom':1,'Benue':1,'Plateau':1,
+    'Kaduna':1,'Kano':1,'Kwara':1,'Kogi':1,'Nasarawa':1,'Ebonyi':1,'Bayelsa':1,
+    'Ondo':1,'Osun':1,'Ekiti':1,
+    'Katsina':0,'Niger':0,'Sokoto':0,'Kebbi':0,'Zamfara':0,'Jigawa':0,
+    'Bauchi':0,'Gombe':0,'Taraba':0,'Adamawa':0,'Yobe':0,'Borno':0,
+  },
+};
+
+// Carrier brand colors
+const CARRIER_COLOR = {
+  'MTN':    '#ffcc00',
+  'Airtel': '#ff3333',
+  'Glo':    '#33cc33',
+  '9mobile':'#9933ff',
+};
+
+// Normalize GADM NAME_1 values to match COVERAGE keys
+function normalizeName(n) {
+  if (!n) return '';
+  const GADM = {
+    'FederalCapitalTerritory':'FCT',
+    'AkwaIbom':'Akwa Ibom',
+    'CrossRiver':'Cross River',
+    'Nassarawa':'Nasarawa',
+  };
+  return GADM[n.trim()] || n.trim();
+}
+
+let mapInitialized = false;
+let leafletMap, geojsonLayer;
+let activeCarrier = 'MTN';
+
+function getStateStyle(stateName, carrier) {
+  const level = COVERAGE[carrier]?.[stateName] ?? 0;
+  const hex   = CARRIER_COLOR[carrier];
+  if (level === 2) return { fillColor: hex,    fillOpacity: 0.75, color: '#000', weight: 0.5, opacity: 0.4 };
+  if (level === 1) return { fillColor: hex,    fillOpacity: 0.30, color: '#000', weight: 0.5, opacity: 0.3 };
+  return               { fillColor: '#111827', fillOpacity: 0.80, color: '#000', weight: 0.5, opacity: 0.3 };
+}
+
+function applyCarrier(carrier) {
+  activeCarrier = carrier;
+  const hex = CARRIER_COLOR[carrier];
+
+  // Update legend swatches
+  document.getElementById('swatch-excellent').style.background = hex;
+  document.getElementById('swatch-excellent').style.opacity    = '1';
+  document.getElementById('swatch-good').style.background      = hex;
+  document.getElementById('swatch-good').style.opacity         = '0.4';
+
+  // Restyle all GeoJSON features
+  if (geojsonLayer) {
+    geojsonLayer.eachLayer(layer => {
+      const name = normalizeName(layer.feature.properties.NAME_1 || '');
+      layer.setStyle(getStateStyle(name, carrier));
+      layer.unbindTooltip();
+      const level = COVERAGE[carrier]?.[name] ?? 0;
+      const levelLabel = level===2?'Excellent 4G/LTE':level===1?'Good 3G/4G':'Limited / 2G only';
+      layer.bindTooltip(`<strong>${name || 'Unknown'}</strong><br/>${levelLabel}`, {sticky:true});
+    });
+  }
+}
+
+function initMap() {
+  mapInitialized = true;
+
+  leafletMap = L.map('map', {
+    center: [9.0, 8.0],
+    zoom: 6,
+    zoomControl: true,
+    attributionControl: false,
+  });
+
+  // Dark tile layer (CartoDB Dark Matter)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+    maxZoom: 10,
+    subdomains: 'abcd',
+  }).addTo(leafletMap);
+
+  // City label layer on top
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+    maxZoom: 10,
+    subdomains: 'abcd',
+    pane: 'shadowPane',
+  }).addTo(leafletMap);
+
+  // Fetch Nigeria states GeoJSON (bundled GADM 4.1 — NAME_1 property)
+  fetch('nigeria-states.geojson')
+    .then(r => { if(!r.ok) throw new Error('fetch failed'); return r.json(); })
+    .then(data => {
+      geojsonLayer = L.geoJSON(data, {
+        style: feature => {
+          const name = normalizeName(feature.properties.NAME_1 || '');
+          return getStateStyle(name, activeCarrier);
+        },
+        onEachFeature: (feature, layer) => {
+          const name = normalizeName(feature.properties.NAME_1 || '');
+          const level = COVERAGE[activeCarrier]?.[name] ?? 0;
+          const levelLabel = level===2?'Excellent 4G/LTE':level===1?'Good 3G/4G':'Limited / 2G only';
+          layer.bindTooltip(`<strong>${name || 'Unknown'}</strong><br/>${levelLabel}`, {sticky:true});
+          layer.on('mouseover', function(){ this.setStyle({weight:2,color:'#fff',opacity:.6}); });
+          layer.on('mouseout',  function(){ geojsonLayer.resetStyle(this); applyCarrier(activeCarrier); });
+        }
+      }).addTo(leafletMap);
+
+      // Fit map to Nigeria bounds
+      leafletMap.fitBounds(geojsonLayer.getBounds(), {padding:[10,10]});
+    })
+    .catch(err => {
+      document.getElementById('map').innerHTML =
+        '<p style="color:#555;text-align:center;padding:40px">Map data failed to load.<br>Check your connection and reload.</p>';
+    });
+
+  // Set initial legend swatches
+  applyCarrier('MTN');
+}
+
+// Carrier toggle buttons
+document.querySelectorAll('.cov-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.cov-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    applyCarrier(b.dataset.carrier);
+  });
+});
 </script>
 </body>
 </html>

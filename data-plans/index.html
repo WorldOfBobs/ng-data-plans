@@ -4,8 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nigeria Data Plans & Coverage</title>
-<!-- Google AdSense (add your publisher ID to activate)
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-REPLACE_WITH_YOUR_ID" crossorigin="anonymous"></script>
+<!-- ═══════════════════════════════════════════════════════
+     AFFILIATE CONFIG — fill in your IDs to activate
+     ═══════════════════════════════════════════════════════
+     1. Google AdSense: sign up at adsense.google.com
+        Replace ca-pub-XXXXXXXXXXXXXXXX below and uncomment the script
+     2. Jumia Affiliate: sign up at jumia.com.ng/sp/affiliate-program/
+        Replace JUMIA_AFFILIATE_ID in the JS config block below
+     3. Wise: sign up at wise.com/partners (Partnerize)
+        Replace WISE_AFFILIATE_URL in the JS config block below
+     ═══════════════════════════════════════════════════════ -->
+<!-- Google AdSense (uncomment + replace publisher ID to activate)
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
 -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -155,11 +165,17 @@
     <p style="font-size:.7rem;color:#444;margin-top:10px;text-align:center">Tap to open carrier site · Plans update regularly · Always verify current price before buying</p>
   </div>
 
-  <!-- ── FXbob promo ── -->
+  <!-- ── FXbob + remittance promo ── -->
   <div class="fxbot-bar">
     <p>💱 Sending money home? Check the real USD→NGN rate before you transfer.</p>
     <a class="promo-btn" href="https://t.me/FXbob_bot" target="_blank" rel="noopener"
        style="background:#0088cc;color:#fff">📲 @FXbob_bot on Telegram</a>
+    <div id="remittance-btns" style="margin-top:10px;display:none">
+      <a id="wise-btn" class="promo-btn" href="#" target="_blank" rel="noopener"
+         style="background:#1a3a2a;border:1px solid #00b67a;color:#00b67a">💚 Send with Wise</a>
+      <a id="remitly-btn" class="promo-btn" href="#" target="_blank" rel="noopener"
+         style="background:#1a1a3a;border:1px solid #4466ff;color:#7799ff">💙 Send with Remitly</a>
+    </div>
     <p style="font-size:.7rem;color:#555;margin-top:8px">Live official + parallel market rate · Daily alerts · Free</p>
   </div>
 </div>
@@ -193,6 +209,40 @@
 </div>
 
 <script>
+// ══════════════════════════════════════════════
+// AFFILIATE CONFIG — swap in your IDs here
+// ══════════════════════════════════════════════
+const AFFILIATE = {
+  // Jumia affiliate ID — get from jumia.com.ng/sp/affiliate-program/
+  // Format: https://c.jumia.com.ng/?a=YOUR_ID&c=&utm_source=affiliate
+  jumia: '', // e.g. '12345'
+
+  // Wise Partnerize link — get from wise.com/partners
+  wise: '', // e.g. 'https://wise.prf.hn/click/camref:...'
+
+  // Remitly affiliate link — get from remitly.com or affiliate network
+  remitly: '', // e.g. 'https://www.remitly.com/?lang=en_us&utm_...'
+};
+
+// Apply affiliate links on load
+(function applyAffiliates() {
+  // Jumia: upgrade generic link to affiliate tracking link
+  if (AFFILIATE.jumia) {
+    const el = document.getElementById('jumia-link');
+    if (el) el.href = `https://c.jumia.com.ng/?a=${AFFILIATE.jumia}&c=&utm_source=affiliate&utm_medium=cpa`;
+  }
+  // Wise + Remitly: show remittance buttons if either link is set
+  const hasWise    = !!AFFILIATE.wise;
+  const hasRemitly = !!AFFILIATE.remitly;
+  if (hasWise || hasRemitly) {
+    document.getElementById('remittance-btns').style.display = 'block';
+    if (hasWise)    { const el = document.getElementById('wise-btn');    if(el) el.href = AFFILIATE.wise; }
+    if (hasRemitly) { const el = document.getElementById('remitly-btn'); if(el) el.href = AFFILIATE.remitly; }
+    if (!hasWise)    document.getElementById('wise-btn')?.remove();
+    if (!hasRemitly) document.getElementById('remitly-btn')?.remove();
+  }
+})();
+
 // ──────────────────────────────────────────────
 // Tab switching
 // ──────────────────────────────────────────────

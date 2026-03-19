@@ -99,7 +99,7 @@
 <body>
 <h1>🇳🇬 Nigeria Data Plans</h1>
 <p class="subtitle">Compare GB-per-naira · Check coverage by network</p>
-<p class="updated">Updated: March 2025 · Tap a plan card to dial USSD</p>
+<p class="updated">Updated: March 2026 · Tap a plan card to dial USSD · All carriers now use *312#</p>
 
 <!-- Tab navigation -->
 <div class="tabs">
@@ -260,26 +260,59 @@ function showTab(name) {
 // ──────────────────────────────────────────────
 // Plans data
 // ──────────────────────────────────────────────
+// ── Plans data — updated March 2026, all carriers use *312# ──
 const PLANS = [
-  {telco:"MTN",   gb:1,    price:1000, days:30, ussd:"*131*1#",      color:"#ffcc00"},
-  {telco:"MTN",   gb:2,    price:2000, days:30, ussd:"*131*1#",      color:"#ffcc00"},
-  {telco:"MTN",   gb:5,    price:3500, days:30, ussd:"*131*1#",      color:"#ffcc00"},
-  {telco:"MTN",   gb:10,   price:5000, days:30, ussd:"*131*1#",      color:"#ffcc00"},
-  {telco:"MTN",   gb:15,   price:6000, days:30, ussd:"*131*1#",      color:"#ffcc00"},
-  {telco:"Airtel",gb:1,    price:1000, days:30, ussd:"*141*712*0#",  color:"#ff3333"},
-  {telco:"Airtel",gb:2,    price:1500, days:30, ussd:"*141*712*0#",  color:"#ff3333"},
-  {telco:"Airtel",gb:5,    price:3000, days:30, ussd:"*141*712*0#",  color:"#ff3333"},
-  {telco:"Airtel",gb:10,   price:5000, days:30, ussd:"*141*712*0#",  color:"#ff3333"},
-  {telco:"Airtel",gb:20,   price:8000, days:30, ussd:"*141*712*0#",  color:"#ff3333"},
-  {telco:"Glo",   gb:1.35, price:500,  days:14, ussd:"*777#",        color:"#33cc33"},
-  {telco:"Glo",   gb:2.9,  price:1000, days:30, ussd:"*777#",        color:"#33cc33"},
-  {telco:"Glo",   gb:7.7,  price:2000, days:30, ussd:"*777#",        color:"#33cc33"},
-  {telco:"Glo",   gb:15,   price:3000, days:30, ussd:"*777#",        color:"#33cc33"},
-  {telco:"Glo",   gb:29.5, price:5000, days:30, ussd:"*777#",        color:"#33cc33"},
-  {telco:"9mobile",gb:1,   price:1000, days:30, ussd:"*229*2*1#",    color:"#9933ff"},
-  {telco:"9mobile",gb:2.5, price:2000, days:30, ussd:"*229*2*1#",    color:"#9933ff"},
-  {telco:"9mobile",gb:11.5,price:4000, days:30, ussd:"*229*2*1#",    color:"#9933ff"},
-  {telco:"9mobile",gb:22,  price:8000, days:30, ussd:"*229*2*1#",    color:"#9933ff"},
+  // MTN — monthly plans (source: nigerianprice.com March 2026)
+  {telco:"MTN", gb:1.5,  price:1000,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 2GB YouTube"},
+  {telco:"MTN", gb:2,    price:1200,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 600MB YouTube/wk"},
+  {telco:"MTN", gb:3,    price:1500,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 4GB YouTube"},
+  {telco:"MTN", gb:4.5,  price:2000,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 4GB YouTube"},
+  {telco:"MTN", gb:6,    price:2500,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 4GB YouTube"},
+  {telco:"MTN", gb:10,   price:3000,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 4GB YouTube"},
+  {telco:"MTN", gb:20,   price:5000,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 4GB YouTube"},
+  {telco:"MTN", gb:25,   price:6000,  days:30, ussd:"*312#", color:"#ffcc00"},
+  {telco:"MTN", gb:40,   price:10000, days:30, ussd:"*312#", color:"#ffcc00"},
+  // MTN — weekly
+  {telco:"MTN", gb:0.45, price:120,   days:7,  ussd:"*312#", color:"#ffcc00"},
+  {telco:"MTN", gb:0.75, price:500,   days:7,  ussd:"*312#", color:"#ffcc00"},
+  {telco:"MTN", gb:6,    price:1500,  days:7,  ussd:"*312#", color:"#ffcc00"},
+
+  // Airtel — monthly plans (source: smartsmssolutions.com 2025/2026)
+  {telco:"Airtel", gb:2,   price:1500,  days:30, ussd:"*312#", color:"#ff3333"},
+  {telco:"Airtel", gb:4.5, price:2000,  days:30, ussd:"*312#", color:"#ff3333"},
+  {telco:"Airtel", gb:6,   price:2500,  days:30, ussd:"*312#", color:"#ff3333"},
+  {telco:"Airtel", gb:10,  price:3000,  days:30, ussd:"*312#", color:"#ff3333"},
+  {telco:"Airtel", gb:20,  price:5000,  days:30, ussd:"*312#", color:"#ff3333"},
+  {telco:"Airtel", gb:40,  price:8000,  days:30, ussd:"*312#", color:"#ff3333"},
+  {telco:"Airtel", gb:62,  price:15000, days:30, ussd:"*312#", color:"#ff3333", note:"+ 2.2GB bonus"},
+  {telco:"Airtel", gb:102, price:20000, days:30, ussd:"*312#", color:"#ff3333", note:"+ bonus"},
+  // Airtel — weekly
+  {telco:"Airtel", gb:0.5, price:500,   days:7,  ussd:"*312#", color:"#ff3333"},
+  {telco:"Airtel", gb:1,   price:800,   days:7,  ussd:"*312#", color:"#ff3333"},
+  {telco:"Airtel", gb:5,   price:1500,  days:7,  ussd:"*312#", color:"#ff3333", note:"+ 2.2GB bonus"},
+  {telco:"Airtel", gb:10,  price:3000,  days:7,  ussd:"*312#", color:"#ff3333", note:"+ 2.2GB bonus"},
+
+  // Glo — monthly plans (source: smartsmssolutions.com 2025, all use *312#)
+  {telco:"Glo", gb:1.25, price:500,   days:14, ussd:"*312#", color:"#33cc33"},
+  {telco:"Glo", gb:2,    price:1000,  days:30, ussd:"*312#", color:"#33cc33"},
+  {telco:"Glo", gb:8.5,  price:2000,  days:30, ussd:"*312#", color:"#33cc33"},
+  {telco:"Glo", gb:15,   price:3000,  days:30, ussd:"*312#", color:"#33cc33"},
+  {telco:"Glo", gb:25,   price:5000,  days:30, ussd:"*312#", color:"#33cc33"},
+  {telco:"Glo", gb:60,   price:10000, days:30, ussd:"*312#", color:"#33cc33"},
+  // Glo — weekly
+  {telco:"Glo", gb:0.45, price:200,   days:7,  ussd:"*312#", color:"#33cc33"},
+  {telco:"Glo", gb:1.8,  price:500,   days:7,  ussd:"*312#", color:"#33cc33"},
+  {telco:"Glo", gb:4.1,  price:1000,  days:7,  ussd:"*312#", color:"#33cc33"},
+
+  // 9mobile — monthly (source: androidpols.com.ng 2025, uses legacy codes still)
+  {telco:"9mobile", gb:1.5,  price:1000,  days:30, ussd:"*229*2*7#",  color:"#9933ff"},
+  {telco:"9mobile", gb:2.5,  price:2000,  days:30, ussd:"*229*2*8#",  color:"#9933ff"},
+  {telco:"9mobile", gb:5,    price:3500,  days:30, ussd:"*229*2*36#", color:"#9933ff"},
+  {telco:"9mobile", gb:11.5, price:8000,  days:30, ussd:"*229*2*5#",  color:"#9933ff"},
+  {telco:"9mobile", gb:15,   price:10000, days:30, ussd:"*229*4*1#",  color:"#9933ff"},
+  // 9mobile — weekly/daily
+  {telco:"9mobile", gb:0.15, price:200,   days:7,  ussd:"*229*2*10#", color:"#9933ff"},
+  {telco:"9mobile", gb:1,    price:300,   days:1,  ussd:"*229*3*3#",  color:"#9933ff"},
 ];
 PLANS.forEach(p => { p.value = (p.gb * 1024) / (p.price / 100); });
 const maxVal = Math.max(...PLANS.map(p=>p.value));
@@ -313,7 +346,7 @@ function render(){
       <span class="telco-name">${p.telco}</span></div>
       <div class="plan-gb">${gbDisplay}<span> GB</span></div>
       <div class="plan-price">₦${p.price.toLocaleString()}</div>
-      <div class="plan-days">${p.days} days · Tap to dial ${p.ussd}</div>
+      <div class="plan-days">${p.days} day${p.days===1?'':'s'}${p.note?' · <span style="color:#aaa">'+p.note+'</span>':''} · Tap to dial ${p.ussd}</div>
       <div class="value-bar"><div class="value-fill" style="width:${fill}%;background:${fillColor}"></div></div>
       <div class="value-score">${Math.round(p.value)} MB per ₦100 spent</div>
     </div>`;

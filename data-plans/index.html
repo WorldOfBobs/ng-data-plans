@@ -112,6 +112,12 @@
 <!-- ════════════════ PLANS TAB ════════════════ -->
 <div id="plans-section">
   <div class="filters">
+    <select id="duration">
+      <option value="0">Any duration</option>
+      <option value="1">Daily (1–2 days)</option>
+      <option value="7">Weekly (7–14 days)</option>
+      <option value="30">Monthly (30 days)</option>
+    </select>
     <select id="minData">
       <option value="0">All sizes</option>
       <option value="1">≥ 1 GB</option>
@@ -328,7 +334,11 @@ function tierLabel(t){return t==='best'?'Best Value':t==='good'?'Good':'Low Valu
 function render(){
   const minGb=parseFloat(document.getElementById('minData').value);
   const maxP =parseFloat(document.getElementById('maxPrice').value);
+  const dur  =parseInt(document.getElementById('duration').value);
   let plans=PLANS.filter(p=>p.gb>=minGb&&p.price<=maxP);
+  if(dur===1)  plans=plans.filter(p=>p.days<=2);
+  if(dur===7)  plans=plans.filter(p=>p.days>=7&&p.days<=14);
+  if(dur===30) plans=plans.filter(p=>p.days>=30);
   if(filterTelco!=='all') plans=plans.filter(p=>p.telco===filterTelco);
   if(sortBy==='value') plans.sort((a,b)=>b.value-a.value);
   if(sortBy==='price') plans.sort((a,b)=>a.price-b.price);
@@ -353,6 +363,7 @@ function render(){
   }).join('');
 }
 
+document.getElementById('duration').addEventListener('change',render);
 document.getElementById('minData').addEventListener('change',render);
 document.getElementById('maxPrice').addEventListener('change',render);
 document.querySelectorAll('.sort-btn').forEach(b=>{

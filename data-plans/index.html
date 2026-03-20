@@ -24,9 +24,7 @@
 <!-- Google AdSense (uncomment + replace publisher ID to activate)
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
 -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<!-- Leaflet CSS/JS loaded lazily when coverage tab is first opened -->
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:#0f0f1a;color:#e0e0e0;font-family:system-ui,-apple-system,sans-serif;min-height:100vh;padding:16px}
@@ -107,7 +105,7 @@
 <body>
 <h1>🍛 JollofData</h1>
 <p class="subtitle">Nigeria's best data plan comparison · MTN · Airtel · Glo · 9mobile</p>
-<p class="updated">Updated: March 2026 · All carriers now use *312# · Tap a plan to copy USSD code</p>
+<p class="updated" id="updated-date">· All carriers now use *312# · Tap a plan to copy USSD code</p>
 
 <!-- Best deal banner -->
 <div id="best-deal-bar" style="background:linear-gradient(135deg,#1a2a0a,#0f1a05);border:1px solid #4a8a1a;border-radius:14px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -119,6 +117,13 @@
      style="background:#25d366;color:#fff;padding:8px 16px;border-radius:20px;font-size:.82rem;font-weight:600;text-decoration:none;white-space:nowrap">
     📲 Share on WhatsApp
   </a>
+</div>
+
+<!-- ── AdSense ad unit (activate by uncommenting + adding publisher ID in head) ── -->
+<div id="ad-top" style="margin-bottom:16px;text-align:center;min-height:90px;display:flex;align-items:center;justify-content:center">
+  <!-- <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="XXXXXXXXXX" data-ad-format="auto" data-full-width-responsive="true"></ins>
+  <script>(adsbygoogle = window.adsbygoogle || []).push({});</script> -->
+  <!-- placeholder: remove this div once AdSense is active -->
 </div>
 
 <!-- Tab navigation -->
@@ -236,6 +241,16 @@
 </div>
 
 <script>
+// ── Auto-date the updated line ──
+(function() {
+  const el = document.getElementById('updated-date');
+  if (el) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const d = new Date();
+    el.textContent = `Updated: ${months[d.getMonth()]} ${d.getFullYear()} · All carriers now use *312# · Tap a plan to copy USSD code`;
+  }
+})();
+
 // ══════════════════════════════════════════════
 // AFFILIATE CONFIG — swap in your IDs here
 // ══════════════════════════════════════════════
@@ -487,6 +502,24 @@ function buildHeatLayer(carrier, cells) {
 function initMap() {
   mapInitialized = true;
 
+  // Lazy-load Leaflet CSS + JS only when map tab is first opened
+  function loadScript(src) {
+    return new Promise(resolve => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = resolve; document.head.appendChild(s);
+    });
+  }
+  function loadCSS(href) {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l);
+  }
+
+  loadCSS('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+  loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js')
+    .then(() => loadScript('https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js'))
+    .then(() => startMap());
+
+  function startMap() {
   leafletMap = L.map('map', {
     center: [9.0, 8.0],
     zoom: 6,
@@ -520,7 +553,8 @@ function initMap() {
     document.getElementById('map').innerHTML =
       '<p style="color:#555;text-align:center;padding:40px">Coverage data failed to load.</p>';
   });
-}
+  } // end startMap
+} // end initMap
 
 // Carrier toggle buttons
 document.querySelectorAll('.cov-btn').forEach(b => {

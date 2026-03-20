@@ -3,7 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nigeria Data Plans & Coverage</title>
+<title>JollofData — Nigeria Data Plans & Coverage</title>
+<meta name="description" content="Compare Nigeria data plans from MTN, Airtel, Glo and 9mobile. Find the best GB-per-naira deal and check network coverage across Nigeria.">
+<meta property="og:title" content="JollofData — Nigeria Data Plans Comparison">
+<meta property="og:description" content="Find the best data plan in Nigeria. Compare MTN, Airtel, Glo & 9mobile by value, price or data size. Coverage map included.">
+<meta property="og:url" content="https://jollofdata.com">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0f0f1a">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍛</text></svg>">
 <!-- ═══════════════════════════════════════════════════════
      AFFILIATE CONFIG — fill in your IDs to activate
      ═══════════════════════════════════════════════════════
@@ -98,9 +105,21 @@
 </style>
 </head>
 <body>
-<h1>🇳🇬 Nigeria Data Plans</h1>
-<p class="subtitle">Compare GB-per-naira · Check coverage by network</p>
-<p class="updated">Updated: March 2026 · Tap a plan card to dial USSD · All carriers now use *312#</p>
+<h1>🍛 JollofData</h1>
+<p class="subtitle">Nigeria's best data plan comparison · MTN · Airtel · Glo · 9mobile</p>
+<p class="updated">Updated: March 2026 · All carriers now use *312# · Tap a plan to copy USSD code</p>
+
+<!-- Best deal banner -->
+<div id="best-deal-bar" style="background:linear-gradient(135deg,#1a2a0a,#0f1a05);border:1px solid #4a8a1a;border-radius:14px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+  <div>
+    <div style="font-size:.7rem;color:#88bb44;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">🏆 Best value right now</div>
+    <div id="best-deal-text" style="font-size:1rem;color:#fff;font-weight:600"></div>
+  </div>
+  <a id="whatsapp-share" href="#" target="_blank" rel="noopener"
+     style="background:#25d366;color:#fff;padding:8px 16px;border-radius:20px;font-size:.82rem;font-weight:600;text-decoration:none;white-space:nowrap">
+    📲 Share on WhatsApp
+  </a>
+</div>
 
 <!-- Tab navigation -->
 <div class="tabs">
@@ -130,6 +149,7 @@
       <option value="999999">Any price</option>
       <option value="1000">≤ ₦1,000</option>
       <option value="2000">≤ ₦2,000</option>
+      <option value="3000">≤ ₦3,000</option>
       <option value="5000">≤ ₦5,000</option>
     </select>
   </div>
@@ -165,8 +185,8 @@
       <a class="carrier-buy-btn" href="https://www.9mobile.com.ng/data-bundles" target="_blank" rel="noopener" style="border-color:#9933ff;color:#bb77ff">
         🟣 9mobile <span>Buy data</span>
       </a>
-      <a class="carrier-buy-btn" href="https://www.jumia.com.ng/catalog/?q=smartphones" target="_blank" rel="noopener" id="jumia-link" style="border-color:#f68b1e;color:#f68b1e">
-        📱 Jumia <span>Shop phones</span>
+      <a class="carrier-buy-btn" href="https://www.jumia.com.ng/catalog/?q=smartphones&price=1-50000" target="_blank" rel="noopener" id="jumia-link" style="border-color:#f68b1e;color:#f68b1e">
+        📱 Jumia <span>Budget phones</span>
       </a>
     </div>
     <p style="font-size:.7rem;color:#444;margin-top:10px;text-align:center">Tap to open carrier site · Plans update regularly · Always verify current price before buying</p>
@@ -351,17 +371,50 @@ function render(){
     const fill=Math.round((p.value/maxVal)*100);
     const fillColor=t==='best'?'#ffd700':t==='good'?'#3a9a3a':'#6a2020';
     const gbDisplay=Number.isInteger(p.gb)?p.gb:p.gb.toFixed(2);
-    return `<div class="card ${t}" onclick="location.href='tel:${p.ussd}'" style="cursor:pointer">
+    const ussdSafe=p.ussd.replace(/'/g,"\\'");
+    return `<div class="card ${t}" onclick="copyUSSD('${ussdSafe}')" style="cursor:pointer">
       <span class="badge ${t}">${tierLabel(t)}</span>
       <div class="telco"><div class="telco-dot" style="background:${p.color}"></div>
       <span class="telco-name">${p.telco}</span></div>
       <div class="plan-gb">${gbDisplay}<span> GB</span></div>
       <div class="plan-price">₦${p.price.toLocaleString()}</div>
-      <div class="plan-days">${p.days} day${p.days===1?'':'s'}${p.note?' · <span style="color:#aaa">'+p.note+'</span>':''} · Tap to dial ${p.ussd}</div>
+      <div class="plan-days">${p.days} day${p.days===1?'':'s'}${p.note?' · <span style="color:#aaa">'+p.note+'</span>':''}</div>
       <div class="value-bar"><div class="value-fill" style="width:${fill}%;background:${fillColor}"></div></div>
-      <div class="value-score">${Math.round(p.value)} MB per ₦100 spent</div>
+      <div class="value-score">${Math.round(p.value)} MB/₦100 · <span style="color:#7799dd">${p.ussd}</span></div>
     </div>`;
   }).join('');
+
+  // Update best deal banner
+  if(plans.length) {
+    const best = [...plans].sort((a,b)=>b.value-a.value)[0];
+    const gb = Number.isInteger(best.gb)?best.gb:best.gb.toFixed(2);
+    document.getElementById('best-deal-text').textContent =
+      `${best.telco} ${gb}GB for ₦${best.price.toLocaleString()} · ${best.days} days · ${best.ussd}`;
+    const msg = encodeURIComponent(`🍛 JollofData tip: Best deal right now is ${best.telco} ${gb}GB for ₦${best.price.toLocaleString()} (${best.days} days). Dial ${best.ussd} to subscribe!\n\nCompare all plans → https://jollofdata.com`);
+    document.getElementById('whatsapp-share').href = `https://wa.me/?text=${msg}`;
+  }
+}
+
+function copyUSSD(code) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(() => showToast('📋 ' + code + ' copied!')).catch(() => showToast('Dial: ' + code));
+  } else {
+    showToast('Dial: ' + code);
+  }
+}
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2d2d50;color:#fff;padding:10px 22px;border-radius:24px;font-size:.85rem;z-index:9999;transition:opacity .3s;pointer-events:none;border:1px solid #5555aa';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2000);
 }
 
 document.getElementById('duration').addEventListener('change',render);

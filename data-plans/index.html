@@ -396,9 +396,10 @@ function render(){
     </div>`;
   }).join('');
 
-  // Update best deal banner
+  // Update best deal banner — prefer weekly plans (7-14 days), fall back to any
   if(plans.length) {
-    const best = [...plans].sort((a,b)=>b.value-a.value)[0];
+    const weeklyPlans = plans.filter(p => p.days >= 7 && p.days <= 14);
+    const best = (weeklyPlans.length ? [...weeklyPlans] : [...plans]).sort((a,b)=>b.value-a.value)[0];
     const gb = Number.isInteger(best.gb)?best.gb:best.gb.toFixed(2);
     document.getElementById('best-deal-text').textContent =
       `${best.telco} ${gb}GB for ₦${best.price.toLocaleString()} · ${best.days} days · ${best.ussd}`;

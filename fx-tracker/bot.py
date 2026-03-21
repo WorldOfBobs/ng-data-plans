@@ -33,6 +33,7 @@ from telegram.ext import (
 import db
 import scraper
 import chart
+import export_rates
 
 # DATA_DIR allows running multiple instances from one codebase.
 DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
@@ -672,6 +673,11 @@ async def job_poll_rates(ctx: ContextTypes.DEFAULT_TYPE):
         saved = db.save_rate(rates["cbn_rate"], rates["parallel_rate"], rates.get("source", "multi"), "USD", default_local)
         saved["fetched_at"]      = datetime.utcnow().isoformat()
         saved["display_sources"] = rates.get("display_sources", [])
+        # Export rates.json for parallelrate.com static site
+        try:
+            export_rates.export()
+        except Exception as ex:
+            logger.warning(f"rates.json export failed: {ex}")
 
         if prev:
             change_pct = (saved["parallel_rate"] - prev["parallel_rate"]) / prev["parallel_rate"] * 100

@@ -106,7 +106,8 @@ def user_country_code(sub: dict | None) -> str:
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
         [KeyboardButton("💱 Rate"),    KeyboardButton("📊 History")],
-        [KeyboardButton("⚙️ Settings"), KeyboardButton("💬 Feedback")],
+        [KeyboardButton("📶 Data Deals"), KeyboardButton("💬 Feedback")],
+        [KeyboardButton("⚙️ Settings")],
     ],
     resize_keyboard=True,
     is_persistent=True,
@@ -202,6 +203,8 @@ def format_rate(r: dict, foreign="USD", local="NGN") -> str:
 
     lines.append("")
     lines.append(f"🕐 {ts} UTC")
+    lines.append("")
+    lines.append("📊 _Compare Nigeria data plans → [jollofdata.com](https://jollofdata.com)_")
 
     return "\n".join(lines)
 
@@ -425,6 +428,21 @@ async def cmd_chart(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # Feedback
 # ──────────────────────────────────────────────
 
+async def cmd_deals(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """
+    /deals — link to JollofData for Nigeria data plan comparison
+    """
+    await update.message.reply_text(
+        "📊 *Best Nigeria Data Plans*\n\n"
+        "Compare MTN, Airtel, Glo & 9mobile by GB-per-naira, price, and duration.\n\n"
+        "👉 [jollofdata.com](https://jollofdata.com)\n\n"
+        "_Coverage map · Weekly picks · Free_",
+        parse_mode="Markdown",
+        reply_markup=MAIN_KEYBOARD,
+    )
+
+# ──────────────────────────────────────────────
+
 async def cmd_feedback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """
     /feedback [message]
@@ -506,6 +524,8 @@ async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif "Feedback" in text:
         ctx.args = []
         await cmd_feedback(update, ctx)
+    elif "Data Deals" in text or "deals" in text.lower():
+        await cmd_deals(update, ctx)
 
 # ──────────────────────────────────────────────
 # Settings
@@ -758,6 +778,7 @@ def main():
     app.add_handler(CommandHandler("briefing",  cmd_briefing_time))
     app.add_handler(CommandHandler("interval",  cmd_interval))
     app.add_handler(CommandHandler("feedback",  cmd_feedback))
+    app.add_handler(CommandHandler("deals",     cmd_deals))
 
     # Inline keyboard callbacks (country picker)
     app.add_handler(CallbackQueryHandler(callback_picker))

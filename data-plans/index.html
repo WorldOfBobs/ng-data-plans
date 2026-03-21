@@ -333,61 +333,40 @@ function showTab(name) {
 // Plans data
 // ──────────────────────────────────────────────
 // ── Plans data — updated March 2026, all carriers use *312# ──
-const PLANS = [
-  // MTN — monthly plans (source: nigerianprice.com March 2026)
-  {telco:"MTN", gb:1.5,  price:1000,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 2GB YouTube"},
-  {telco:"MTN", gb:2,    price:1200,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 600MB YouTube/wk"},
-  {telco:"MTN", gb:3,    price:1500,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 4GB YouTube"},
-  {telco:"MTN", gb:4.5,  price:2000,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 4GB YouTube"},
-  {telco:"MTN", gb:6,    price:2500,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 4GB YouTube"},
-  {telco:"MTN", gb:10,   price:3000,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 4GB YouTube"},
-  {telco:"MTN", gb:20,   price:5000,  days:30, ussd:"*312#", color:"#ffcc00", note:"+ 4GB YouTube"},
-  {telco:"MTN", gb:25,   price:6000,  days:30, ussd:"*312#", color:"#ffcc00"},
-  {telco:"MTN", gb:40,   price:10000, days:30, ussd:"*312#", color:"#ffcc00"},
-  // MTN — weekly
-  {telco:"MTN", gb:0.45, price:120,   days:7,  ussd:"*312#", color:"#ffcc00"},
-  {telco:"MTN", gb:0.75, price:500,   days:7,  ussd:"*312#", color:"#ffcc00"},
-  {telco:"MTN", gb:6,    price:1500,  days:7,  ussd:"*312#", color:"#ffcc00"},
+// ── Plans loaded from plans.json (edit that file to update prices) ──
+const TELCO_COLORS = {
+  "MTN":    "#ffcc00",
+  "Airtel": "#ff3333",
+  "Glo":    "#33cc33",
+  "9mobile":"#9933ff",
+};
 
-  // Airtel — monthly plans (source: smartsmssolutions.com 2025/2026)
-  {telco:"Airtel", gb:2,   price:1500,  days:30, ussd:"*312#", color:"#ff3333"},
-  {telco:"Airtel", gb:4.5, price:2000,  days:30, ussd:"*312#", color:"#ff3333"},
-  {telco:"Airtel", gb:6,   price:2500,  days:30, ussd:"*312#", color:"#ff3333"},
-  {telco:"Airtel", gb:10,  price:3000,  days:30, ussd:"*312#", color:"#ff3333"},
-  {telco:"Airtel", gb:20,  price:5000,  days:30, ussd:"*312#", color:"#ff3333"},
-  {telco:"Airtel", gb:40,  price:8000,  days:30, ussd:"*312#", color:"#ff3333"},
-  {telco:"Airtel", gb:62,  price:15000, days:30, ussd:"*312#", color:"#ff3333", note:"+ 2.2GB bonus"},
-  {telco:"Airtel", gb:102, price:20000, days:30, ussd:"*312#", color:"#ff3333", note:"+ bonus"},
-  // Airtel — weekly
-  {telco:"Airtel", gb:0.5, price:500,   days:7,  ussd:"*312#", color:"#ff3333"},
-  {telco:"Airtel", gb:1,   price:800,   days:7,  ussd:"*312#", color:"#ff3333"},
-  {telco:"Airtel", gb:5,   price:1500,  days:7,  ussd:"*312#", color:"#ff3333", note:"+ 2.2GB bonus"},
-  {telco:"Airtel", gb:10,  price:3000,  days:7,  ussd:"*312#", color:"#ff3333", note:"+ 2.2GB bonus"},
+let PLANS = [];
+let maxVal = 1;
+let plansVerified = '';
 
-  // Glo — monthly plans (source: smartsmssolutions.com 2025, all use *312#)
-  {telco:"Glo", gb:1.25, price:500,   days:14, ussd:"*312#", color:"#33cc33"},
-  {telco:"Glo", gb:2,    price:1000,  days:30, ussd:"*312#", color:"#33cc33"},
-  {telco:"Glo", gb:8.5,  price:2000,  days:30, ussd:"*312#", color:"#33cc33"},
-  {telco:"Glo", gb:15,   price:3000,  days:30, ussd:"*312#", color:"#33cc33"},
-  {telco:"Glo", gb:25,   price:5000,  days:30, ussd:"*312#", color:"#33cc33"},
-  {telco:"Glo", gb:60,   price:10000, days:30, ussd:"*312#", color:"#33cc33"},
-  // Glo — weekly
-  {telco:"Glo", gb:0.45, price:200,   days:7,  ussd:"*312#", color:"#33cc33"},
-  {telco:"Glo", gb:1.8,  price:500,   days:7,  ussd:"*312#", color:"#33cc33"},
-  {telco:"Glo", gb:4.1,  price:1000,  days:7,  ussd:"*312#", color:"#33cc33"},
+async function loadPlans() {
+  try {
+    const res = await fetch('/plans.json?t=' + Date.now());
+    const data = await res.json();
+    PLANS = data.plans.map(p => ({
+      ...p,
+      color: TELCO_COLORS[p.telco] || '#888',
+      value: (p.gb * 1024) / (p.price / 100),
+    }));
+    maxVal = Math.max(...PLANS.map(p => p.value));
+    plansVerified = data.meta?.last_verified || '';
+    if (plansVerified) {
+      const el = document.getElementById('updated-date');
+      if (el) el.textContent = `Prices verified: ${plansVerified} · All carriers use *312# · Tap to copy USSD`;
+    }
+    render();
+  } catch(e) {
+    console.warn('plans.json unavailable, using fallback');
+    render();
+  }
+}
 
-  // 9mobile — monthly (source: androidpols.com.ng 2025, uses legacy codes still)
-  {telco:"9mobile", gb:1.5,  price:1000,  days:30, ussd:"*229*2*7#",  color:"#9933ff"},
-  {telco:"9mobile", gb:2.5,  price:2000,  days:30, ussd:"*229*2*8#",  color:"#9933ff"},
-  {telco:"9mobile", gb:5,    price:3500,  days:30, ussd:"*229*2*36#", color:"#9933ff"},
-  {telco:"9mobile", gb:11.5, price:8000,  days:30, ussd:"*229*2*5#",  color:"#9933ff"},
-  {telco:"9mobile", gb:15,   price:10000, days:30, ussd:"*229*4*1#",  color:"#9933ff"},
-  // 9mobile — weekly/daily
-  {telco:"9mobile", gb:0.15, price:200,   days:7,  ussd:"*229*2*10#", color:"#9933ff"},
-  {telco:"9mobile", gb:1,    price:300,   days:1,  ussd:"*229*3*3#",  color:"#9933ff"},
-];
-PLANS.forEach(p => { p.value = (p.gb * 1024) / (p.price / 100); });
-const maxVal = Math.max(...PLANS.map(p=>p.value));
 
 let sortBy='value', filterTelco='all';
 
@@ -478,7 +457,7 @@ document.querySelectorAll('.telco-btn').forEach(b=>{
     b.classList.add('active'); filterTelco=b.dataset.telco; render();
   });
 });
-render();
+loadPlans(); // fetch plans.json and render
 
 // ──────────────────────────────────────────────
 // Coverage Map — real OpenCelliD tower density data

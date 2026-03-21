@@ -135,10 +135,10 @@
 </div>
 
 <!-- ── AdSense ad unit (activate by uncommenting + adding publisher ID in head) ── -->
-<div id="ad-top" style="margin-bottom:16px;text-align:center;min-height:90px;display:flex;align-items:center;justify-content:center">
-  <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8000061058031420" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
-  <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-</div>
+<!-- AdSense Auto Ads active via script in <head> — Google places ads automatically.
+     When AdSense approves this site, enable Auto Ads in the AdSense dashboard
+     under Ads > By site > jollofdata.com > Auto ads toggle ON.
+     To add a specific manual unit, create it in AdSense and add the slot ID here. -->
 
 <!-- Tab navigation -->
 <div class="tabs">
@@ -166,6 +166,7 @@
     </select>
     <select id="maxPrice">
       <option value="999999">Any price</option>
+      <option value="500">≤ ₦500</option>
       <option value="1000">≤ ₦1,000</option>
       <option value="2000">≤ ₦2,000</option>
       <option value="3000">≤ ₦3,000</option>
@@ -207,7 +208,7 @@
       <a class="carrier-buy-btn" href="https://www.jumia.com.ng/catalog/?q=smartphones&price=1-50000" target="_blank" rel="noopener" id="jumia-link" style="border-color:#f68b1e;color:#f68b1e">
         📱 Jumia <span>Budget phones</span>
       </a>
-      <a class="carrier-buy-btn" href="https://affiliate.konga.com" target="_blank" rel="noopener" id="konga-link" style="border-color:#cc0000;color:#ff5555">
+      <a class="carrier-buy-btn" href="https://www.konga.com/category/phones-tablets-5229" target="_blank" rel="noopener" id="konga-link" style="border-color:#cc0000;color:#ff5555">
         🛍️ Konga <span>Shop phones</span>
       </a>
     </div>
@@ -217,9 +218,9 @@
   <!-- ── Telegram deal alerts ── -->
   <div style="background:linear-gradient(135deg,#0a1a2a,#051020);border:1px solid #1a4a6a;border-radius:14px;padding:16px 20px;margin:16px 0;text-align:center">
     <p style="font-size:.85rem;color:#ccc;margin-bottom:10px">📣 Get the best data deal every week — free Telegram alerts</p>
-    <a href="https://t.me/JollofData" target="_blank" rel="noopener"
+    <a href="https://t.me/FXbob_bot" target="_blank" rel="noopener"
        style="display:inline-block;background:#0088cc;color:#fff;padding:9px 22px;border-radius:20px;font-size:.85rem;font-weight:600;text-decoration:none">
-      📲 Join @JollofData on Telegram
+      📲 Get alerts on @FXbob_bot
     </a>
     <p style="font-size:.7rem;color:#444;margin-top:8px">Weekly best-value picks · No spam · Free forever</p>
   </div>
@@ -229,6 +230,8 @@
     <p>💱 Sending money home? Check the real USD→NGN rate before you transfer.</p>
     <a class="promo-btn" href="https://t.me/FXbob_bot" target="_blank" rel="noopener"
        style="background:#0088cc;color:#fff">📲 @FXbob_bot on Telegram</a>
+    <a class="promo-btn" href="https://parallelrate.com" target="_blank" rel="noopener"
+       style="background:#1a2a1a;border:1px solid #00c896;color:#00c896">💱 parallelrate.com</a>
     <div id="remittance-btns" style="margin-top:10px;display:none">
       <a id="wise-btn" class="promo-btn" href="#" target="_blank" rel="noopener"
          style="background:#1a3a2a;border:1px solid #00b67a;color:#00b67a">💚 Send with Wise</a>

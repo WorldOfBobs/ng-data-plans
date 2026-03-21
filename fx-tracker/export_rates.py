@@ -66,11 +66,27 @@ def export():
     # Also write next to this script for fallback
     local_path = os.path.join(os.path.dirname(__file__), "rates.json")
 
-    for path in [local_path]:
+    parallelrate_path = os.path.expanduser("~/dev/parallelrate/rates.json")
+
+    for path in [local_path, parallelrate_path]:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             json.dump(output, f, indent=2)
         print(f"Exported {len(rates)} rate pairs to {path}")
+
+    # Auto-commit and push to GitHub so parallelrate.com gets live data
+    repo_dir = os.path.dirname(parallelrate_path)
+    try:
+        import subprocess
+        subprocess.run(["git", "add", "rates.json"], cwd=repo_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", f"rates: auto-update {output['updated_at']}"],
+            cwd=repo_dir, check=True, capture_output=True
+        )
+        subprocess.run(["git", "push", "origin", "master"], cwd=repo_dir, check=True, capture_output=True)
+        print(f"Pushed rates.json to GitHub at {output['updated_at']}")
+    except Exception as e:
+        print(f"Git push failed (non-fatal): {e}")
 
     return output
 

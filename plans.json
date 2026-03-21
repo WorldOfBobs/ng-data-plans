@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "last_verified": "2026-03-21",
+    "source": "Official carrier pricing — nigerianprice.com, smartsmssolutions.com",
+    "note": "All carriers now use *312# unified USSD code (NCC mandate, late 2024)"
+  },
+  "plans": [
+    {"telco":"MTN",     "gb":0.45,  "price":120,   "days":7,  "ussd":"*312#", "note":""},
+    {"telco":"MTN",     "gb":0.75,  "price":500,   "days":7,  "ussd":"*312#", "note":""},
+    {"telco":"MTN",     "gb":6,     "price":1500,  "days":7,  "ussd":"*312#", "note":""},
+    {"telco":"MTN",     "gb":1.5,   "price":1000,  "days":30, "ussd":"*312#", "note":"+ 2GB YouTube"},
+    {"telco":"MTN",     "gb":2,     "price":1200,  "days":30, "ussd":"*312#", "note":"+ 600MB YouTube/wk"},
+    {"telco":"MTN",     "gb":3,     "price":1500,  "days":30, "ussd":"*312#", "note":"+ 4GB YouTube"},
+    {"telco":"MTN",     "gb":4.5,   "price":2000,  "days":30, "ussd":"*312#", "note":"+ 4GB YouTube"},
+    {"telco":"MTN",     "gb":6,     "price":2500,  "days":30, "ussd":"*312#", "note":"+ 4GB YouTube"},
+    {"telco":"MTN",     "gb":10,    "price":3000,  "days":30, "ussd":"*312#", "note":"+ 4GB YouTube"},
+    {"telco":"MTN",     "gb":20,    "price":5000,  "days":30, "ussd":"*312#", "note":"+ 4GB YouTube"},
+    {"telco":"MTN",     "gb":25,    "price":6000,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"MTN",     "gb":40,    "price":10000, "days":30, "ussd":"*312#", "note":""},
+
+    {"telco":"Airtel",  "gb":0.5,   "price":500,   "days":7,  "ussd":"*312#", "note":""},
+    {"telco":"Airtel",  "gb":1,     "price":800,   "days":7,  "ussd":"*312#", "note":""},
+    {"telco":"Airtel",  "gb":5,     "price":1500,  "days":7,  "ussd":"*312#", "note":"+ 2.2GB bonus"},
+    {"telco":"Airtel",  "gb":10,    "price":3000,  "days":7,  "ussd":"*312#", "note":"+ 2.2GB bonus"},
+    {"telco":"Airtel",  "gb":2,     "price":1500,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"Airtel",  "gb":4.5,   "price":2000,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"Airtel",  "gb":6,     "price":2500,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"Airtel",  "gb":10,    "price":3000,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"Airtel",  "gb":20,    "price":5000,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"Airtel",  "gb":40,    "price":8000,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"Airtel",  "gb":62,    "price":15000, "days":30, "ussd":"*312#", "note":"+ 2.2GB bonus"},
+    {"telco":"Airtel",  "gb":102,   "price":20000, "days":30, "ussd":"*312#", "note":"+ bonus"},
+
+    {"telco":"Glo",     "gb":0.45,  "price":200,   "days":7,  "ussd":"*312#", "note":""},
+    {"telco":"Glo",     "gb":1.8,   "price":500,   "days":7,  "ussd":"*312#", "note":""},
+    {"telco":"Glo",     "gb":4.1,   "price":1000,  "days":7,  "ussd":"*312#", "note":""},
+    {"telco":"Glo",     "gb":1.25,  "price":500,   "days":14, "ussd":"*312#", "note":""},
+    {"telco":"Glo",     "gb":2,     "price":1000,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"Glo",     "gb":8.5,   "price":2000,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"Glo",     "gb":15,    "price":3000,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"Glo",     "gb":25,    "price":5000,  "days":30, "ussd":"*312#", "note":""},
+    {"telco":"Glo",     "gb":60,    "price":10000, "days":30, "ussd":"*312#", "note":""},
+
+    {"telco":"9mobile", "gb":0.15,  "price":200,   "days":7,  "ussd":"*229*2*10#", "note":""},
+    {"telco":"9mobile", "gb":1,     "price":300,   "days":1,  "ussd":"*229*3*3#",  "note":""},
+    {"telco":"9mobile", "gb":1.5,   "price":1000,  "days":30, "ussd":"*229*2*7#",  "note":""},
+    {"telco":"9mobile", "gb":2.5,   "price":2000,  "days":30, "ussd":"*229*2*8#",  "note":""},
+    {"telco":"9mobile", "gb":5,     "price":3500,  "days":30, "ussd":"*229*2*36#", "note":""},
+    {"telco":"9mobile", "gb":11.5,  "price":8000,  "days":30, "ussd":"*229*2*5#",  "note":""},
+    {"telco":"9mobile", "gb":15,    "price":10000, "days":30, "ussd":"*229*4*1#",  "note":""}
+  ]
+}

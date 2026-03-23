@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80">
+  <defs>
+    <linearGradient id="bowlGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35"/>
+      <stop offset="100%" style="stop-color:#C44020"/>
+    </linearGradient>
+    <linearGradient id="barGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF6B35"/>
+      <stop offset="100%" style="stop-color:#FFB347"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: cooking pot with rising data bars -->
+  <!-- Pot body -->
+  <path d="M14 42 Q12 68 42 68 Q72 68 70 42 Z" fill="url(#bowlGrad)"/>
+  <!-- Pot rim -->
+  <rect x="10" y="39" width="64" height="6" rx="3" fill="#C44020"/>
+  <!-- Pot handles -->
+  <rect x="4" y="38" width="8" height="10" rx="4" fill="#A33518"/>
+  <rect x="72" y="38" width="8" height="10" rx="4" fill="#A33518"/>
+  <!-- Data bars rising from pot (steam/data) -->
+  <rect x="21" y="14" width="9" height="24" rx="2" fill="url(#barGrad)" opacity="0.9"/>
+  <rect x="33" y="6"  width="9" height="32" rx="2" fill="url(#barGrad)"/>
+  <rect x="45" y="18" width="9" height="20" rx="2" fill="url(#barGrad)" opacity="0.85"/>
+  <rect x="57" y="22" width="9" height="16" rx="2" fill="url(#barGrad)" opacity="0.75"/>
+
+  <!-- Wordmark -->
+  <!-- "Jollof" -->
+  <text x="92" y="48"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="900"
+    font-size="32"
+    fill="#1A1A1A"
+    letter-spacing="-0.5">Jollof</text>
+
+  <!-- "Data" — bold orange, spaced -->
+  <text x="94" y="67"
+    font-family="Arial, 'Helvetica Neue', sans-serif"
+    font-weight="700"
+    font-size="15"
+    fill="#E8542A"
+    letter-spacing="6">DATA</text>
+
+  <!-- Dot accent between Jollof and Data baseline -->
+  <circle cx="87" cy="62" r="3" fill="#FF6B35"/>
+</svg>

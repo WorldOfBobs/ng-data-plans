@@ -121,7 +121,7 @@
 <h1>🍛 JollofData</h1>
 <p class="subtitle">Nigeria's best data plan comparison · MTN · Airtel · Glo · 9mobile</p>
 <p style="text-align:center;font-size:.78rem;color:#555;margin-bottom:6px">✅ 40+ plans compared · Prices verified March 2026 · Official carrier pricing · All *312# codes</p>
-<p class="updated" id="updated-date">· All carriers now use *312# · Tap a plan to copy USSD code</p>
+<p class="updated" id="updated-date">· All carriers now use *312# · Tap on mobile to dial · Click on desktop to copy</p>
 
 <!-- Best deal banner -->
 <div id="best-deal-bar" style="background:linear-gradient(135deg,#1a2a0a,#0f1a05);border:1px solid #4a8a1a;border-radius:14px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -333,7 +333,7 @@
   if (el) {
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const d = new Date();
-    el.textContent = `Updated: ${months[d.getMonth()]} ${d.getFullYear()} · All carriers now use *312# · Tap a plan to copy USSD code`;
+    el.textContent = `Updated: ${months[d.getMonth()]} ${d.getFullYear()} · All carriers now use *312# · Tap on mobile to dial · Click to copy`;
   }
 })();
 
@@ -460,7 +460,7 @@ function render(){
       <div class="plan-price">₦${p.price.toLocaleString()}</div>
       <div class="plan-days">${p.days} day${p.days===1?'':'s'}${p.note?' · <span style="color:#aaa">'+p.note+'</span>':''}</div>
       <div class="value-bar"><div class="value-fill" style="width:${fill}%;background:${fillColor}"></div></div>
-      <div class="value-score">${Math.round(p.value)} MB/₦100 · <span style="color:#7799dd">${p.ussd}</span></div>
+      <div class="value-score">${Math.round(p.value)} MB/₦100 · <span style="color:#7799dd" title="Tap to dial on mobile, click to copy on desktop">${p.ussd} 📞</span></div>
     </div>`;
   }).join('');
 
@@ -477,6 +477,16 @@ function render(){
 }
 
 function copyUSSD(code) {
+  // On mobile, open the dialer directly via tel: link
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isMobile) {
+    // Encode # as %23 so the full USSD code passes correctly to the dialer
+    const telCode = code.replace(/#/g, '%23');
+    window.location.href = 'tel:' + telCode;
+    showToast('📞 Opening dialer: ' + code);
+    return;
+  }
+  // Desktop: copy to clipboard
   if (navigator.clipboard) {
     navigator.clipboard.writeText(code).then(() => showToast('📋 ' + code + ' copied!')).catch(() => showToast('Dial: ' + code));
   } else {
